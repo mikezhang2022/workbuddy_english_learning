@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>自然拼读跟读卡片</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#F7F6F2;color:#262626;display:flex;flex-direction:column;overscroll-behavior:none;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+header{padding:14px 16px 8px;display:flex;justify-content:space-between;align-items:center;}
+#progress{font-size:13px;color:#8a8a86;}
+#status{font-size:12px;color:#185FA5;min-height:16px;text-align:right;max-width:60%;}
+#tabs{display:flex;gap:8px;padding:0 16px 10px;}
+.tab{flex:1;padding:10px 0;border-radius:12px;border:0.5px solid #DCDAD3;background:#FFFFFF;font-size:14px;color:#262626;cursor:pointer;}
+.tab.active{background:#185FA5;color:#FFFFFF;border-color:transparent;}
+#groups{display:flex;gap:8px;padding:0 16px 10px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+#groups::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;padding:8px 14px;border-radius:999px;font-size:13px;border:0.5px solid rgba(0,0,0,0.08);cursor:pointer;white-space:nowrap;}
+#card{flex:1;margin:4px 16px 8px;border-radius:26px;background:#FFFFFF;border:0.5px solid #E7E5DE;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;touch-action:pan-y;cursor:pointer;min-height:0;overflow:hidden;}
+#card.compact{flex:0 0 auto;padding:16px 20px;gap:6px;min-height:0;}
+#card.compact .words,#card.compact #playbtn,#card.compact #hint,#card.compact #swipehint{display:none;}
+#card.compact #combo{font-size:44px;}
+#card.compact #ipa{font-size:16px;margin-bottom:0;padding:3px 12px;}
+#card.compact #tag{font-size:12px;padding:4px 12px;margin-bottom:4px;}
+#tag{font-size:13px;padding:5px 14px;border-radius:999px;margin-bottom:8px;}
+#combo{font-size:64px;font-weight:500;line-height:1.1;}
+#ipa{font-size:18px;padding:4px 14px;border-radius:10px;margin-bottom:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+.words{display:flex;flex-direction:column;gap:8px;margin:8px 0 12px;align-items:center;}
+.w{display:flex;align-items:baseline;gap:10px;}
+.en{font-size:34px;font-weight:500;}
+.cn{font-size:17px;color:#8a8a86;}
+#playbtn{width:74px;height:74px;border-radius:50%;background:#185FA5;display:flex;align-items:center;justify-content:center;margin:6px 0 12px;flex-shrink:0;}
+#playbtn svg{margin-left:3px;}
+#hint{font-size:13px;color:#a3a29d;text-align:center;}
+#swipehint{font-size:12px;color:#c2c1bc;text-align:center;margin-top:8px;}
+#drill{margin:0 16px 10px;background:#FFFFFF;border:0.5px solid #E7E5DE;border-radius:16px;padding:12px 14px;}
+#drillStage{font-size:14px;color:#262626;line-height:1.6;margin-bottom:10px;min-height:20px;}
+#drillChips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.dchip{padding:10px 16px;border-radius:12px;border:0.5px solid #DCDAD3;background:#F7F6F2;font-size:15px;cursor:pointer;}
+.dchip b{font-size:17px;font-weight:500;}
+.dchip span{font-size:12px;color:#8a8a86;margin-left:6px;}
+#drillInputRow{display:flex;gap:8px;margin-bottom:10px;align-items:center;}
+#drillInput{flex:1;padding:10px 12px;border-radius:12px;border:0.5px solid #DCDAD3;font-size:15px;background:#FFFFFF;color:#262626;}
+#drillGo{padding:10px 16px;border-radius:12px;border:0.5px solid #DCDAD3;background:#F0EFEA;font-size:14px;cursor:pointer;}
+#drillMic{width:44px;height:44px;border-radius:50%;background:#185FA5;color:#FFFFFF;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+#drillMic:active{background:#0C447C;}
+#drillMic.recording{background:#E24B4A;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+#drillBtns{display:flex;gap:8px;}
+#drillBtns button{flex:1;padding:11px 0;border-radius:12px;border:0.5px solid #DCDAD3;background:#FFFFFF;font-size:14px;cursor:pointer;}
+#drillBtns button:active,#drillGo:active{background:#F0EFEA;}
+footer{display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#FFFFFF;border-top:0.5px solid #E7E5DE;}
+footer button{flex:1;padding:13px 0;border-radius:14px;border:0.5px solid #DCDAD3;background:#FFFFFF;font-size:14px;color:#262626;cursor:pointer;}
+footer button:active{background:#F0EFEA;}
+#auto.active{background:#185FA5;color:#FFFFFF;border-color:transparent;}
+details{margin:0 16px 12px;font-size:12px;color:#8a8a86;background:#F0EFEA;border-radius:12px;padding:10px 14px;}
+summary{cursor:pointer;color:#6b6a66;font-size:12px;}
+details p{margin:8px 0 0;line-height:1.7;}
+</style>
+</head>
+<body>
+<header>
+  <div id="progress">第 1 / 52 张</div>
+  <div id="status">就绪</div>
+</header>
+<div id="tabs">
+  <button id="tabRead" class="tab active">跟读</button>
+  <button id="tabDrill" class="tab">听音拼写</button>
+</div>
+<nav id="groups"></nav>
+<main id="card">
+  <div id="tag"></div>
+  <div id="combo"></div>
+  <div id="ipa"></div>
+  <div class="words" id="words"></div>
+  <div id="playbtn"><svg width="26" height="26" viewBox="0 0 10 10"><path d="M2.5 1.5 L8.5 5 L2.5 8.5 Z" fill="#FFFFFF"/></svg></div>
+  <div id="hint">点卡片任意位置，听三遍跟读</div>
+  <div id="swipehint">← 左右滑动换卡 →</div>
+</main>
+<div id="drill" hidden>
+  <p id="drillStage"></p>
+  <div id="drillChips"></div>
+  <div id="drillInputRow" hidden>
+    <button id="drillMic" title="录音"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></button>
+    <input id="drillInput" placeholder="点击麦克风说话，或手动输入后回车">
+    <button id="drillGo">判断</button>
+  </div>
+  <div id="drillBtns">
+    <button id="drillRetry">再听一次</button>
+    <button id="drillReveal">看答案</button>
+  </div>
+</div>
+<footer>
+  <button id="prev">上一张</button>
+  <button id="auto">自动连播：关</button>
+  <button id="next">下一张</button>
+</footer>
+<details>
+  <summary>使用说明</summary>
+  <p>1. 跟读模式：点卡片任意位置，播放「字母 ×3 → 发音 ×3 → 例词 + 中文 ×3」；再点一次可停止。</p>
+  <p>2. 听音拼写模式：点卡片 → 听字母和发音 → 麦克风或输入框说出一个含该音的单词（卡片上不会显示答案，避免照抄）→ 答对或点「看答案」才揭晓 → 拼写（s-t-a-r）。答错后才显示例词作为提示。</p>
+  <p>3. 左右滑动或点底部按钮换卡；顶部彩色按钮可跳到对应规则组。</p>
+  <p>4. 语音优先用手机自带语音（离线可用）；若浏览器没有语音引擎，会自动切换为网络语音（需联网）。听音拼写需要麦克风（HTTPS 环境）：iPhone 上一般可用；安卓手机的网页语音识别走 Google 服务器、国内常连不上，此时页面会自动提示你点下面的单词或手动输入——输入框聚焦后也可以用手机自带的「语音键盘」直接说话转文字。</p>
+  <p>5. 微信里打开时：Android 选「用浏览器打开」，iOS 建议用 Safari，微信内置预览可能限制语音和麦克风。</p>
+</details>
+<script>
+(function(){
+var GROUPS=[
+ {n:'R 控制元音',bg:'#FAECE7',c:'#993C1D'},
+ {n:'Magic E 长元音',bg:'#E6F1FB',c:'#185FA5'},
+ {n:'元音组合',bg:'#E1F5EE',c:'#0F6E56'},
+ {n:'辅音字母组合',bg:'#EEEDFE',c:'#534AB7'},
+ {n:'辅音组合',bg:'#EAF3DE',c:'#3B6D11'}
+];
+var D=[
+[0,'ar','/ɑː/','ah','star','星星','car','汽车'],
+[0,'er','/ɜː/','er','her','她的','teacher','老师'],
+[0,'ir','/ɜː/','ir','bird','鸟','girl','女孩'],
+[0,'ur','/ɜː/','ur','nurse','护士','turn','转动'],
+[0,'or','/ɔː/','aw','fork','叉子','horse','马'],
+[1,'a_e','/eɪ/','ay','cake','蛋糕','name','名字'],
+[1,'i_e','/aɪ/','eye','kite','风筝','five','五'],
+[1,'o_e','/əʊ/','oh','nose','鼻子','home','家'],
+[1,'u_e','/juː/','you','cute','可爱的','use','使用'],
+[1,'e_e','/iː/','ee','these','这些','Chinese','中文'],
+[2,'ai','/eɪ/','ay','rain','雨','train','火车'],
+[2,'ay','/eɪ/','ay','play','玩','day','白天'],
+[2,'ee','/iː/','ee','see','看见','three','三'],
+[2,'ea','/iː/','ee','sea','大海','bread','面包'],
+[2,'oa','/əʊ/','oh','boat','船','coat','外套'],
+[2,'oo','/uː/','oo','moon','月亮','book','书'],
+[2,'oi','/ɔɪ/','oy','coin','硬币','oil','油'],
+[2,'oy','/ɔɪ/','oy','boy','男孩','toy','玩具'],
+[2,'ou','/aʊ/','ow','house','房子','mouse','老鼠'],
+[2,'ow','/aʊ/','ow','cow','牛','snow','雪'],
+[2,'au','/ɔː/','aw','autumn','秋天','because','因为'],
+[2,'aw','/ɔː/','aw','draw','画画','saw','看见'],
+[3,'sh','/ʃ/','shh','ship','轮船','fish','鱼'],
+[3,'ch','/tʃ/','ch','chair','椅子','China','中国'],
+[3,'th','/θ/ /ð/','th','three','三','this','这个'],
+[3,'ph','/f/','fuh','phone','电话','photo','照片'],
+[3,'wh','/w/','wuh','white','白色','where','哪里'],
+[3,'ck','/k/','kuh','duck','鸭子','clock','钟'],
+[3,'kn','/n/','nuh','knife','刀','know','知道'],
+[3,'wr','/r/','ruh','write','写','wrong','错的'],
+[3,'ng','/ŋ/','ng','sing','唱歌','long','长的'],
+[3,'qu','/kw/','kwuh','queen','女王','quiet','安静的'],
+[4,'bl','/bl/','bluh','blue','蓝色'],
+[4,'br','/br/','bruh','bread','面包'],
+[4,'cl','/kl/','kluh','clock','钟'],
+[4,'cr','/kr/','kruh','cry','哭'],
+[4,'dr','/dr/','druh','dress','连衣裙'],
+[4,'fl','/fl/','fluh','flag','旗子'],
+[4,'fr','/fr/','fruh','friend','朋友'],
+[4,'gl','/gl/','gluh','glass','玻璃'],
+[4,'gr','/gr/','gruh','green','绿色'],
+[4,'pl','/pl/','pluh','plane','飞机'],
+[4,'pr','/pr/','pruh','price','价格'],
+[4,'sk','/sk/','skuh','sky','天空'],
+[4,'sl','/sl/','sluh','sleep','睡觉'],
+[4,'sm','/sm/','smuh','smile','微笑'],
+[4,'sn','/sn/','snuh','snow','雪'],
+[4,'sp','/sp/','spuh','sport','运动'],
+[4,'st','/st/','stuh','star','星星'],
+[4,'sw','/sw/','swuh','swim','游泳'],
+[4,'tr','/tr/','truh','tree','树'],
+[4,'str','/str/','struh','street','街道']
+];
+var deck=D.map(function(it){
+ var o={g:GROUPS[it[0]],combo:it[1],ipa:it[2],sk:it[3],ws:[]};
+ for(var i=4;i<it.length;i+=2){o.ws.push([it[i],it[i+1]]);}
+ return o;
+});
+var cur=0,auto=false,justSwiped=false,mode='read',drillRevealed=false;
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=null,listening=false;
+var elProg=document.getElementById('progress'),elSt=document.getElementById('status'),
+ elCard=document.getElementById('card'),elTag=document.getElementById('tag'),
+ elCombo=document.getElementById('combo'),elIpa=document.getElementById('ipa'),
+ elWords=document.getElementById('words'),elAuto=document.getElementById('auto'),
+ elHint=document.getElementById('hint'),elDrill=document.getElementById('drill'),
+ elStage=document.getElementById('drillStage'),elChips=document.getElementById('drillChips'),
+ elInputRow=document.getElementById('drillInputRow'),elInput=document.getElementById('drillInput'),
+ elTabRead=document.getElementById('tabRead'),elTabDrill=document.getElementById('tabDrill');
+var nav=document.getElementById('groups');
+for(var gi=0;gi<GROUPS.length;gi++){
+ (function(g){
+  var b=document.createElement('div');
+  b.className='chip';b.style.background=g.bg;b.style.color=g.c;
+  b.textContent=g.n;
+  b.addEventListener('click',function(){for(var k=0;k<deck.length;k++){if(deck[k].g===g){goto(k);break;}}});
+  nav.appendChild(b);
+ })(GROUPS[gi]);
+}
+var voices=[];
+function gv(){try{voices=window.speechSynthesis.getVoices();}catch(e){voices=[];}}
+if('speechSynthesis' in window){gv();window.speechSynthesis.onvoiceschanged=gv;}
+function pick(lang){
+ gv();
+ var pref=/Google|Samantha|Microsoft|Natural|Huihui|Kangkang|Yaoyao|Xiaoxiao/i;
+ for(var i=0;i<voices.length;i++){if(voices[i].lang.indexOf(lang)>-1&&pref.test(voices[i].name)){return voices[i];}}
+ for(var j=0;j<voices.length;j++){if(voices[j].lang.indexOf(lang)>-1){return voices[j];}}
+ return null;
+}
+var useTTS='speechSynthesis' in window;
+var audioFallback=!useTTS;
+var audioEl=document.createElement('audio');
+var audioGen=0,ttsGen=0;
+var zhOk=useTTS?!!pick('zh'):true;
+if(!useTTS){elSt.textContent='本机无语音引擎，已启用网络语音';}
+function ttsUrl(t,l){
+ var q=encodeURIComponent(t);
+ if(l.indexOf('zh')>-1){return 'https://fanyi.baidu.com/gettts?lan=zh&text='+q+'&spd=4&source=web';}
+ return 'https://dict.youdao.com/dictvoice?audio='+q+'&type=2';
+}
+function audioSeq(items,onDone){
+ var gen=++audioGen;
+ audioEl.pause();audioEl.onended=null;audioEl.onerror=null;
+ var i=0,total=items.length;
+ function next(){
+  if(gen!==audioGen){return;}
+  if(i>=total){if(onDone){onDone();}return;}
+  var it=items[i++];
+  elSt.textContent='正在朗读 ('+i+'/'+total+')';
+  audioEl.src=ttsUrl(it.t,it.l);
+  audioEl.onended=function(){setTimeout(next,60);};
+  audioEl.onerror=function(){setTimeout(next,150);};
+  var p=audioEl.play();
+  if(p&&p.catch){p.catch(function(){setTimeout(next,150);});}
+ }
+ next();
+}
+function speakSeq(items,onDone){
+ if(!useTTS||audioFallback){audioSeq(items,onDone);return;}
+ var gen=++ttsGen;
+ window.speechSynthesis.cancel();
+ window.speechSynthesis.resume();
+ var i=0,total=items.length;
+ function next(){
+  if(gen!==ttsGen){return;}
+  if(i>=total){if(onDone){onDone();}return;}
+  var it=items[i++];
+  elSt.textContent='正在朗读 ('+i+'/'+total+')';
+  var u=new SpeechSynthesisUtterance(it.t);
+  u.lang=it.l;u.rate=0.8;u.volume=1;
+  var v=pick(it.l);if(v){u.voice=v;}
+  var started=false;
+  u.onstart=function(){started=true;};
+  u.onend=function(){setTimeout(next,60);};
+  u.onerror=function(){setTimeout(next,60);};
+  if(i===1){
+   setTimeout(function(){
+    if(!started&&gen===ttsGen){
+     audioFallback=true;
+     window.speechSynthesis.cancel();
+     elSt.textContent='已切换网络语音';
+     audioSeq(items,onDone);
+    }
+   },1500);
+  }
+  window.speechSynthesis.speak(u);
+ }
+ next();
+}
+function stop(){try{window.speechSynthesis.cancel();}catch(e){}audioEl.pause();audioEl.onended=null;audioGen++;if(rec){try{rec.abort();}catch(e2){}}listening=false;elSt.textContent='已停止';}
+function buildItems(card){
+ var items=[];
+ var sp=card.combo.replace('_',' ');
+ for(var i=0;i<3;i++){items.push({t:sp,l:'en-US'});}
+ for(var j=0;j<3;j++){items.push({t:card.sk,l:'en-US'});}
+ for(var r=0;r<3;r++){
+  for(var k=0;k<card.ws.length;k++){
+   items.push({t:card.ws[k][0],l:'en-US'});
+   if(zhOk){items.push({t:card.ws[k][1],l:'zh-CN'});}
+  }
+ }
+ return items;
+}
+function playCard(i){
+ elSt.textContent='正在朗读…';
+ speakSeq(buildItems(deck[i]),function(){
+  if(auto){
+   elSt.textContent='自动连播，下一张…';
+   setTimeout(function(){goto((i+1)%deck.length);playCard((i+1)%deck.length);},800);
+  }else{
+   elSt.textContent='朗读完成';
+  }
+ });
+}
+function render(i){
+ var c=deck[i];
+ cur=i;
+ elProg.textContent='第 '+(i+1)+' / '+deck.length+' 张';
+ elTag.textContent=c.g.n;
+ elTag.style.background=c.g.bg;elTag.style.color=c.g.c;
+ elCombo.textContent=c.combo;
+ elIpa.textContent=c.ipa;
+ elIpa.style.background=c.g.bg;elIpa.style.color=c.g.c;
+ elWords.innerHTML='';
+ for(var k=0;k<c.ws.length;k++){
+  var w=document.createElement('div');w.className='w';
+  var en=document.createElement('span');en.className='en';en.textContent=c.ws[k][0];
+  var cn=document.createElement('span');cn.className='cn';cn.textContent=c.ws[k][1];
+  w.appendChild(en);w.appendChild(cn);
+  elWords.appendChild(w);
+ }
+ resetDrill(i);
+}
+function goto(i){
+ stop();justSwiped=false;
+ cur=(i+deck.length)%deck.length;
+ render(cur);
+}
+function setMode(m){
+ mode=m;
+ elTabRead.classList.toggle('active',m==='read');
+ elTabDrill.classList.toggle('active',m==='drill');
+ elDrill.hidden=m!=='drill';
+ elAuto.hidden=m!=='read';
+ elCard.classList.toggle('compact',m==='drill');
+ elHint.textContent=m==='read'?'点卡片任意位置，听三遍跟读':'点卡片开始：听音 → 跟说 → 拼写';
+ resetDrill(cur);
+}
+function resetDrill(i){
+ if(mode!=='drill'){return;}
+ drillRevealed=false;
+ elStage.textContent='点上面的卡片，开始「'+deck[i].combo.replace('_','')+'」的听音练习';
+ elChips.innerHTML='';elChips.hidden=true;
+ elInputRow.hidden=true;
+ elInput.value='';
+ document.getElementById('drillReveal').textContent='看答案';
+}
+function showChips(c){
+ elChips.innerHTML='';
+ for(var k=0;k<c.ws.length;k++){
+  (function(w){
+   var b=document.createElement('div');b.className='dchip';
+   b.innerHTML='<b>'+w[0]+'</b><span>'+w[1]+'</span>';
+   b.addEventListener('click',function(){drillResult(cur,w[0]);});
+   elChips.appendChild(b);
+  })(c.ws[k]);
+ }
+}
+function judge(c,t){
+ var txt=t.toLowerCase().trim();
+ if(c.combo.indexOf('_')>-1){
+  var v=c.combo.charAt(0);
+  var pat=new RegExp(v+'[^aeiou\\s]*e');
+  if(pat.test(txt)){return true;}
+  for(var i=0;i<c.ws.length;i++){if(txt.indexOf(c.ws[i][0].toLowerCase())>-1){return true;}}
+  return false;
+ }
+ return txt.indexOf(c.combo.toLowerCase())>-1;
+}
+function drillStart(i){
+ var c=deck[i];
+ stop();
+ drillRevealed=false;
+ elChips.innerHTML='';elChips.hidden=true;
+ elInputRow.hidden=false;
+ elInput.value='';
+ document.getElementById('drillReveal').textContent='看答案';
+ elStage.textContent='① 听：字母 '+c.combo.replace('_',' ')+' 和发音 '+c.ipa+'，请记住它';
+ var comboSpeak=c.combo.replace('_','').split('').join(' ');
+ var items=[{t:comboSpeak,l:'en-US'},{t:c.sk,l:'en-US'}];
+ if(zhOk){items.push({t:'请说一个带这个发音的英文单词',l:'zh-CN'});}
+ speakSeq(items,function(){ask(i);});
+}
+function ask(i){
+ var c=deck[i];
+ elStage.textContent='② 请说一个含 '+c.combo.replace('_','')+' 音的单词（不公布答案，菜单/输入框都不显示）';
+ elInputRow.hidden=false;
+ elChips.hidden=true;
+ elInput.focus();
+}
+function drillMic(i){
+ var c=deck[i];
+ var mic=document.getElementById('drillMic');
+ function fallback(why){
+  listening=false;
+  mic.classList.remove('recording');
+  elStage.textContent='② '+why+'，请手动输入一个含 '+c.combo.replace('_','')+' 音的单词';
+  elInputRow.hidden=false;
+  elChips.hidden=true;
+ }
+ if(!SR){
+  fallback('本机不支持语音识别');
+  return;
+ }
+ if(listening){
+  try{rec.stop();}catch(e){}
+  listening=false;mic.classList.remove('recording');
+  elStage.textContent='② 已取消录音';
+  return;
+ }
+ listening=true;mic.classList.add('recording');
+ elStage.textContent='② 🎤 正在听你说…请大声说一个含 '+c.combo.replace('_','')+' 音的单词';
+ var got=false,fin=false;
+ try{
+  rec=new SR();
+  rec.lang='en-US';rec.interimResults=false;rec.maxAlternatives=1;
+  rec.onresult=function(e){
+   if(got||fin){return;}got=true;fin=true;listening=false;mic.classList.remove('recording');
+   try{rec.abort();}catch(e2){}
+   var raw=e.results[0][0].transcript||'';
+   var t=raw.replace(/[^a-zA-Z' -]/g,' ').trim().split(/\s+/)[0]||'';
+   if(!t){fallback('没有识别到单词');return;}
+   elInput.value=t;
+   drillResult(i,t);
+  };
+  rec.onerror=function(e){
+   if(fin){return;}
+   var m={'not-allowed':'麦克风权限被拒绝','no-speech':'没听到声音','network':'识别服务连不上（国内网络限制）','aborted':'录音已取消','service-not-allowed':'浏览器禁止语音识别'}[e.error]||('识别出错：'+e.error);
+   fallback(m);
+  };
+  rec.onend=function(){
+   if(!got&&!fin){listening=false;mic.classList.remove('recording');}
+  };
+  rec.start();
+ }catch(err){
+  fallback('麦克风启动失败：'+err.message);
+  return;
+ }
+ setTimeout(function(){
+  if(!got&&!fin){
+   fin=true;listening=false;mic.classList.remove('recording');
+   try{rec.stop();}catch(e2){}
+   fallback('10 秒内没有识别到语音');
+  }
+ },10000);
+}
+function drillResult(i,t){
+ stop();
+ var c=deck[i];
+ var mic=document.getElementById('drillMic');if(mic){mic.classList.remove('recording');}
+ if(!t||!t.trim()){elStage.textContent='没有识别到单词，请重试或换一种方式';return;}
+ var w=t.trim();
+ if(judge(c,w)){
+  elStage.textContent='✓ 对！「'+w+'」里有 '+c.combo.replace('_','')+' 音';
+  var items=[{t:w,l:'en-US'}];
+  if(zhOk){items.push({t:'对，非常好',l:'zh-CN'});}
+  speakSeq(items,function(){reveal(i,w);});
+ }else{
+  elStage.textContent='✗ 「'+w+'」里没有 '+c.combo.replace('_','')+' 音（提示已显示，点查看或换词再试）';
+  showChips(c);
+  elChips.hidden=false;
+  elInputRow.hidden=false;
+  var its=[];
+  if(zhOk){its.push({t:'再试一次',l:'zh-CN'});}
+  speakSeq(its);
+ }
+}
+function reveal(i, userWord){
+ drillRevealed=true;
+ var c=deck[i],firstEx=c.ws[0];
+ var ans=userWord||firstEx[0];
+ var cn=userWord?'':'（'+firstEx[1]+'）';
+ elStage.textContent='③ 答案：'+ans+' = '+ans.split('').join('-')+cn;
+ elInputRow.hidden=true;
+ elChips.hidden=true;
+ document.getElementById('drillReveal').textContent='下一张';
+ var sp=ans.split('').join(' ');
+ var items=[{t:ans,l:'en-US'},{t:sp,l:'en-US'}];
+ if(!userWord&&zhOk){items.push({t:firstEx[1],l:'zh-CN'});}
+ speakSeq(items);
+}
+elCard.addEventListener('click',function(){
+ if(justSwiped){justSwiped=false;return;}
+ if(mode==='drill'){drillStart(cur);return;}
+ if('speechSynthesis' in window&&window.speechSynthesis.speaking){stop();}
+ else{playCard(cur);}
+});
+var tx=0,ty=0;
+elCard.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
+elCard.addEventListener('touchend',function(e){
+ var dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
+ if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){
+  justSwiped=true;
+  if(dx<0){goto(cur+1);}else{goto(cur-1);}
+ }
+},{passive:true});
+document.getElementById('prev').addEventListener('click',function(){goto(cur-1);});
+document.getElementById('next').addEventListener('click',function(){goto(cur+1);});
+document.getElementById('drillRetry').addEventListener('click',function(){
+ var c=deck[cur];
+ elChips.hidden=true;
+ elInput.value='';
+ elStage.textContent='① 听：字母 '+c.combo.replace('_',' ')+' 和发音 '+c.ipa+'，请记住它';
+ var comboSpeak=c.combo.replace('_','').split('').join(' ');
+ var items=[{t:comboSpeak,l:'en-US'},{t:c.sk,l:'en-US'}];
+ if(zhOk){items.push({t:'请说一个带这个发音的英文单词',l:'zh-CN'});}
+ speakSeq(items,function(){ask(cur);});
+});
+document.getElementById('drillReveal').addEventListener('click',function(){
+ if(!drillRevealed){reveal(cur);}else{goto(cur+1);}
+});
+document.getElementById('drillMic').addEventListener('click',function(){drillMic(cur);});
+elInput.addEventListener('keydown',function(e){if(e.key==='Enter'){drillResult(cur,elInput.value);}});
+document.getElementById('drillGo').addEventListener('click',function(){drillResult(cur,elInput.value);});
+elAuto.addEventListener('click',function(){
+ auto=!auto;
+ elAuto.textContent='自动连播：'+(auto?'开':'关');
+ elAuto.classList.toggle('active',auto);
+});
+elTabRead.addEventListener('click',function(){setMode('read');});
+elTabDrill.addEventListener('click',function(){setMode('drill');});
+document.addEventListener('keydown',function(e){
+ if(e.key==='ArrowLeft'){goto(cur-1);}
+ if(e.key==='ArrowRight'){goto(cur+1);}
+});
+render(0);
+})();
+</script>
+</body>
+</html>

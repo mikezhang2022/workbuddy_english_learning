@@ -1,0 +1,10 @@
+# 项目内部数据(工作日志/记忆),不推送到 GitHub
+.workbuddy/
+
+# 压缩包与构建产物
+*.zip
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
