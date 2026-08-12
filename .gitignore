@@ -4,6 +4,11 @@
 # 压缩包与构建产物
 *.zip
 
+# 临时生成物(音频合成缓存/调试脚本)
+_audio/
+_gen_audio.py
+_tmp.js
+
 # 操作系统文件
 .DS_Store
 Thumbs.db
