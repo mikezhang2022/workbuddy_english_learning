@@ -116,8 +116,8 @@ var GROUPS=[
 var D=[
 [0,'ar','/ɑː/','ah','star','星星','car','汽车'],
 [0,'er','/ɜː/','er','her','她的','teacher','老师'],
-[0,'ir','/ɜː/','ir','bird','鸟','girl','女孩'],
-[0,'ur','/ɜː/','ur','nurse','护士','turn','转动'],
+[0,'ir','/ɜː/','er','bird','鸟','girl','女孩'],
+[0,'ur','/ɜː/','er','nurse','护士','turn','转动'],
 [0,'or','/ɔː/','aw','fork','叉子','horse','马'],
 [1,'a_e','/eɪ/','ay','cake','蛋糕','name','名字'],
 [1,'i_e','/aɪ/','eye','kite','风筝','five','五'],
@@ -360,7 +360,16 @@ function drillStart(i){
  elInputRow.hidden=false;
  elInput.value='';
  document.getElementById('drillReveal').textContent='看答案';
- elStage.textContent='① 听：字母 '+c.combo.replace('_',' ')+' 和发音 '+c.ipa+'，请记住它';
+ playDrillAudio(i);
+}
+function playDrillAudio(i){
+ var c=deck[i];
+ elChips.hidden=true;
+ elInput.value='';
+ var rc=(c.combo==='er'||c.combo==='ir'||c.combo==='ur');
+ var stageText='① 听：字母 '+c.combo.replace('_',' ')+' 和发音 '+c.ipa+'，请记住它';
+ if(rc){stageText+='（er/ir/ur 发音都是 /ɜː/，只是拼写不同）';}
+ elStage.textContent=stageText;
  var comboSpeak=c.combo.replace('_','').split('').join(' ');
  var items=[{t:comboSpeak,l:'en-US'},{t:c.sk,l:'en-US'}];
  if(zhOk){items.push({t:'请说一个带这个发音的英文单词',l:'zh-CN'});}
@@ -481,16 +490,7 @@ elCard.addEventListener('touchend',function(e){
 },{passive:true});
 document.getElementById('prev').addEventListener('click',function(){goto(cur-1);});
 document.getElementById('next').addEventListener('click',function(){goto(cur+1);});
-document.getElementById('drillRetry').addEventListener('click',function(){
- var c=deck[cur];
- elChips.hidden=true;
- elInput.value='';
- elStage.textContent='① 听：字母 '+c.combo.replace('_',' ')+' 和发音 '+c.ipa+'，请记住它';
- var comboSpeak=c.combo.replace('_','').split('').join(' ');
- var items=[{t:comboSpeak,l:'en-US'},{t:c.sk,l:'en-US'}];
- if(zhOk){items.push({t:'请说一个带这个发音的英文单词',l:'zh-CN'});}
- speakSeq(items,function(){ask(cur);});
-});
+document.getElementById('drillRetry').addEventListener('click',function(){playDrillAudio(cur);});
 document.getElementById('drillReveal').addEventListener('click',function(){
  if(!drillRevealed){reveal(cur);}else{goto(cur+1);}
 });
