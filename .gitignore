@@ -13,3 +13,13 @@ _tmp.js
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# CursorDesk (API key, build output, local session db)
+**/key.txt
+CursorDesk/**/bin/
+CursorDesk/**/obj/
+**/*.user
+.vs/
+*.db
+*.db-journal
+*.suo
