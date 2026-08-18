@@ -105,12 +105,31 @@ namespace CursorDesk.Api
             };
 
             var json = JsonConvert.SerializeObject(body, JsonSettings);
-            return SendAsync<AgentCreateResponse>(
+            var raw = await SendRawAsync<string>(
                 HttpMethod.Post,
                 "v1/agents",
                 json,
                 HttpStatusCode.Created,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+
+            // API returns {"agent": {...}, "run": {...}} — unwrap.
+            var wrapped = JsonConvert.DeserializeObject<AgentCreateResponseWrapper>(raw, JsonSettings);
+            if (wrapped == null || wrapped.Agent == null)
+            {
+                throw new CursorApiException("Create agent returned unexpected response.");
+            }
+
+            // Merge run id from the top-level "run" field if agent lacks it.
+            if (string.IsNullOrWhiteSpace(wrapped.Agent.LatestRunId) && wrapped.Run != null)
+            {
+                wrapped.Agent.LatestRunId = wrapped.Run.Id;
+                if (wrapped.Agent.LatestRun == null && !string.IsNullOrWhiteSpace(wrapped.Run.Id))
+                {
+                    wrapped.Agent.LatestRun = new RunRef { Id = wrapped.Run.Id };
+                }
+            }
+
+            return wrapped.Agent;
         }
 
         public Task<RunResponse> GetRunAsync(string agentId, string runId, CancellationToken cancellationToken)
@@ -178,6 +197,21 @@ namespace CursorDesk.Api
         }
 
         private async Task<T> SendAsync<T>(
+            HttpMethod method,
+            string relativePath,
+            string jsonBody,
+            HttpStatusCode expectedStatus,
+            CancellationToken cancellationToken)
+        {
+            var body = await SendRawAsync<string>(method, relativePath, jsonBody, expectedStatus, cancellationToken).ConfigureAwait(false);
+            return Deserialize<T>(body);
+        }
+
+        /// <summary>
+        /// Sends an HTTP request and returns the raw response body as a string.
+        /// Used when the caller needs to do custom deserialization (e.g. wrapped responses).
+        /// </summary>
+        private async Task<string> SendRawAsync<T>(
             HttpMethod method,
             string relativePath,
             string jsonBody,

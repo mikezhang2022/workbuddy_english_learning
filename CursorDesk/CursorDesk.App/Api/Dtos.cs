@@ -80,6 +80,19 @@ namespace CursorDesk.Api
         public bool AutoCreatePR { get; set; }
     }
 
+    public sealed class AgentCreateResponseWrapper
+    {
+        /// <summary>
+        /// POST /v1/agents returns {"agent": {...}, "run": {...}} — not flat.
+        /// This wrapper unpacks the real fields.
+        /// </summary>
+        [JsonProperty("agent")]
+        public AgentCreateResponse Agent { get; set; }
+
+        [JsonProperty("run")]
+        public RunRef Run { get; set; }
+    }
+
     public sealed class AgentCreateResponse
     {
         [JsonProperty("id")]
