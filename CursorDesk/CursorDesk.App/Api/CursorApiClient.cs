@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -8,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace CursorDesk.Api
 {
@@ -146,6 +148,281 @@ namespace CursorDesk.Api
 
             var path = "v1/agents/" + Uri.EscapeDataString(agentId) + "/runs/" + Uri.EscapeDataString(runId);
             return SendAsync<RunResponse>(HttpMethod.Get, path, null, HttpStatusCode.OK, cancellationToken);
+        }
+
+        /// <summary>
+        /// GET /v1/agents/{id} — check whether a previously created agent is still reusable.
+        /// </summary>
+        public Task<AgentResponse> GetAgentAsync(string agentId, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                throw new ArgumentException("Agent id is required.", nameof(agentId));
+            }
+
+            var path = "v1/agents/" + Uri.EscapeDataString(agentId);
+            return SendAsync<AgentResponse>(HttpMethod.Get, path, null, HttpStatusCode.OK, cancellationToken);
+        }
+
+        /// <summary>
+        /// POST /v1/agents/{id}/runs — create a follow-up run on a warm (already-started) agent.
+        /// Skips the VM cold-start that POST /v1/agents pays every time.
+        /// </summary>
+        public async Task<RunRef> CreateRunAsync(
+            string agentId,
+            string promptText,
+            string modelId,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                throw new ArgumentException("Agent id is required.", nameof(agentId));
+            }
+
+            if (string.IsNullOrWhiteSpace(promptText))
+            {
+                throw new ArgumentException("Prompt is required.", nameof(promptText));
+            }
+
+            if (string.IsNullOrWhiteSpace(modelId))
+            {
+                modelId = DefaultModelId;
+            }
+
+            var body = new RunCreateRequest
+            {
+                Prompt = new PromptBody { Text = promptText },
+                Model = new ModelSpec
+                {
+                    Id = modelId,
+                    Params = new object[0]
+                }
+            };
+
+            var json = JsonConvert.SerializeObject(body, JsonSettings);
+            var raw = await SendRawAsync(
+                HttpMethod.Post,
+                "v1/agents/" + Uri.EscapeDataString(agentId) + "/runs",
+                json,
+                HttpStatusCode.Created,
+                cancellationToken).ConfigureAwait(false);
+
+            var wrapped = JsonConvert.DeserializeObject<RunCreateResponseWrapper>(raw, JsonSettings);
+            if (wrapped == null || wrapped.Run == null || string.IsNullOrWhiteSpace(wrapped.Run.Id))
+            {
+                throw new CursorApiException("Create run returned no run id.");
+            }
+
+            return wrapped.Run;
+        }
+
+        /// <summary>
+        /// Streams a run's output via SSE (GET .../stream). Calls onToken for each assistant text delta.
+        /// Returns the final result text (from the "result" event) when the stream ends.
+        /// </summary>
+        public async Task<string> StreamRunAsync(
+            string agentId,
+            string runId,
+            Action<string> onToken,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                throw new ArgumentException("Agent id is required.", nameof(agentId));
+            }
+
+            if (string.IsNullOrWhiteSpace(runId))
+            {
+                throw new ArgumentException("Run id is required.", nameof(runId));
+            }
+
+            var path = "v1/agents/" + Uri.EscapeDataString(agentId)
+                + "/runs/" + Uri.EscapeDataString(runId) + "/stream";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.Accept.Clear();
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (TaskCanceledException ex)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                throw new CursorApiException("Request timed out.", ex);
+            }
+
+            string resultText;
+            try
+            {
+                using (response)
+                {
+                    ThrowIfFailedSimple(response);
+
+                    var finalResult = new StringBuilder();
+                    using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                    using (var reader = new StreamReader(stream))
+                    {
+                        string line;
+                        string dataBuffer = null;
+                        string eventType = null;
+
+                        while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                eventType = line.Substring(6).Trim();
+                                continue;
+                            }
+
+                            if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                dataBuffer = line.Substring(5).Trim();
+                                continue;
+                            }
+
+                            // Empty line = end of one SSE event; flush.
+                            if (line.Length == 0 && dataBuffer != null)
+                            {
+                                DispatchSseEvent(eventType, dataBuffer, onToken, finalResult);
+                                dataBuffer = null;
+                                eventType = null;
+                            }
+                        }
+                    }
+
+                    resultText = finalResult.ToString();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // SSE stream failed or aborted (e.g. stream_unavailable). Degrade gracefully to
+                // a plain run poll, which is the same path the original code used and is reliable.
+                resultText = await FallbackPollAsync(agentId, runId, cancellationToken).ConfigureAwait(false);
+                return resultText;
+            }
+
+            // Stream ended but no final result captured — the text may live in an event we don't
+            // parse (e.g. interaction_update). Fall back to a plain run poll for the full result.
+            if (string.IsNullOrWhiteSpace(resultText))
+            {
+                resultText = await FallbackPollAsync(agentId, runId, cancellationToken).ConfigureAwait(false);
+            }
+
+            return resultText;
+        }
+
+        /// <summary>
+        /// Reliable fallback used when SSE streaming fails or returns no usable text.
+        /// Polls GET /v1/agents/{id}/runs/{runId} until FINISHED and returns the result.
+        /// </summary>
+        private async Task<string> FallbackPollAsync(string agentId, string runId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var run = await PollUntilFinishedAsync(agentId, runId, cancellationToken).ConfigureAwait(false);
+                return run == null ? string.Empty : run.GetResultText();
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
+        }
+
+        private void DispatchSseEvent(string eventType, string data, Action<string> onToken, StringBuilder finalResult)
+        {
+            if (string.Equals(eventType, "assistant", StringComparison.OrdinalIgnoreCase))
+            {
+                // data is a JSON object: {"text":"..."}. Pull out the text delta.
+                var token = ExtractText(data);
+                if (!string.IsNullOrEmpty(token) && onToken != null)
+                {
+                    onToken(token);
+                }
+
+                return;
+            }
+
+            if (string.Equals(eventType, "result", StringComparison.OrdinalIgnoreCase))
+            {
+                // data is {"runId":...,"status":"FINISHED","text":"...","durationMs":...}
+                var parsed = ExtractText(data);
+                if (!string.IsNullOrEmpty(parsed))
+                {
+                    finalResult.Append(parsed);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Extracts plain answer text from an SSE data payload.
+        /// Handles both {"text":"..."} objects and bare JSON strings; falls back to the
+        /// raw string if it cannot be parsed.
+        /// </summary>
+        private static string ExtractText(string data)
+        {
+            if (string.IsNullOrWhiteSpace(data))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var token = JToken.Parse(data);
+                if (token.Type == JTokenType.Object)
+                {
+                    var text = token["text"];
+                    if (text != null && text.Type != JTokenType.Null)
+                    {
+                        return text.Value<string>() ?? string.Empty;
+                    }
+
+                    return token.ToString(Formatting.None);
+                }
+
+                if (token.Type == JTokenType.String)
+                {
+                    return token.Value<string>() ?? string.Empty;
+                }
+
+                return token.ToString(Formatting.None);
+            }
+            catch (JsonException)
+            {
+                return data;
+            }
+        }
+
+        private void ThrowIfFailedSimple(HttpResponseMessage response)
+        {
+            var code = (int)response.StatusCode;
+            if (code == 401)
+            {
+                throw CursorApiException.InvalidKey();
+            }
+
+            if (code == 429)
+            {
+                throw CursorApiException.RateLimited(60);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new CursorApiException("HTTP " + code + ": stream unavailable", code);
+            }
         }
 
         public async Task<RunResponse> PollUntilFinishedAsync(

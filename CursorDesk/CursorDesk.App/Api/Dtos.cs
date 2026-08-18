@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -101,6 +102,9 @@ namespace CursorDesk.Api
         [JsonProperty("latestRunId")]
         public string LatestRunId { get; set; }
 
+        [JsonProperty("status")]
+        public string Status { get; set; }
+
         [JsonProperty("url")]
         public string Url { get; set; }
 
@@ -121,6 +125,67 @@ namespace CursorDesk.Api
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// GET /v1/agents/{id} — used to check whether a reused agent is still alive.
+    /// </summary>
+    public sealed class AgentResponse
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("status")]
+        public string Status { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
+
+        public bool IsReusable()
+        {
+            if (string.IsNullOrWhiteSpace(Status))
+            {
+                return false;
+            }
+
+            // ACTIVE / CREATING / BUSY are usable; ARCHIVED / EXPIRED are not.
+            return !Status.Equals("ARCHIVED", StringComparison.OrdinalIgnoreCase)
+                && !Status.Equals("EXPIRED", StringComparison.OrdinalIgnoreCase)
+                && !Status.Equals("FAILED", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// POST /v1/agents/{agentId}/runs — creates a follow-up run on a warm agent (no VM cold start).
+    /// </summary>
+    public sealed class RunCreateRequest
+    {
+        [JsonProperty("prompt")]
+        public PromptBody Prompt { get; set; }
+
+        [JsonProperty("model")]
+        public ModelSpec Model { get; set; }
+    }
+
+    public sealed class RunCreateResponseWrapper
+    {
+        [JsonProperty("agent")]
+        public AgentRef Agent { get; set; }
+
+        [JsonProperty("run")]
+        public RunRef Run { get; set; }
+    }
+
+    public sealed class AgentRef
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("status")]
+        public string Status { get; set; }
+
+        [JsonProperty("url")]
+        public string Url { get; set; }
     }
 
     public sealed class RunRef
@@ -153,6 +218,15 @@ namespace CursorDesk.Api
             if (Result.Type == JTokenType.String)
             {
                 return Result.Value<string>() ?? string.Empty;
+            }
+
+            if (Result.Type == JTokenType.Object)
+            {
+                var text = Result["text"];
+                if (text != null && text.Type != JTokenType.Null)
+                {
+                    return text.Value<string>() ?? string.Empty;
+                }
             }
 
             return Result.ToString(Formatting.Indented);

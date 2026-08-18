@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -16,6 +17,10 @@ namespace CursorDesk.App
         private CancellationTokenSource _cts;
         private string _accountLabel = string.Empty;
         private bool _busy;
+        private string _currentAgentId = string.Empty;
+        private string _currentAgentUrl = string.Empty;
+        private const string SettingAgentId = "currentAgentId";
+        private const string SettingAgentUrl = "currentAgentUrl";
 
         public MainForm()
         {
@@ -223,33 +228,66 @@ namespace CursorDesk.App
             {
                 SetBusy(true, "Sending…");
                 _txtAnswer.Text = string.Empty;
+                EnsureStore();
 
-                var created = await _api.CreateAgentAsync(prompt, modelId, _cts.Token).ConfigureAwait(true);
-                if (created == null || string.IsNullOrWhiteSpace(created.Id))
+                // Try to reuse a warm agent (skip VM cold start) if we have one stored.
+                string agentId = LoadCurrentAgentId();
+                if (!string.IsNullOrWhiteSpace(agentId) && !await IsAgentReusableAsync(agentId).ConfigureAwait(true))
                 {
-                    throw new CursorApiException("Create agent returned no id.");
+                    agentId = null;
                 }
 
-                var runId = created.ResolveRunId();
+                string runId;
+                if (string.IsNullOrWhiteSpace(agentId))
+                {
+                    // First call (or previous agent expired): pay the cold start once.
+                    SetStatus("working", "Starting agent (first call is slower)…");
+                    var created = await _api.CreateAgentAsync(prompt, modelId, _cts.Token).ConfigureAwait(true);
+                    if (created == null || string.IsNullOrWhiteSpace(created.Id))
+                    {
+                        throw new CursorApiException("Create agent returned no id.");
+                    }
+
+                    agentId = created.Id;
+                    _currentAgentId = created.Id;
+                    _currentAgentUrl = created.Url ?? string.Empty;
+                    SaveCurrentAgent();
+                    runId = created.ResolveRunId();
+                }
+                else
+                {
+                    // Warm reuse: no VM cold start.
+                    SetStatus("working", "Reusing agent…");
+                    var run = await _api.CreateRunAsync(agentId, prompt, modelId, _cts.Token).ConfigureAwait(true);
+                    runId = run == null ? null : run.Id;
+                }
+
                 if (string.IsNullOrWhiteSpace(runId))
                 {
-                    throw new CursorApiException("Create agent returned no latestRunId.");
+                    throw new CursorApiException("No run id was returned.");
                 }
 
-                SetStatus("working", "Polling run " + runId + "…");
-                var run = await _api.PollUntilFinishedAsync(created.Id, runId, _cts.Token).ConfigureAwait(true);
-                var answer = run == null ? string.Empty : run.GetResultText();
-                var url = FirstNonEmpty(run == null ? null : run.Url, created.Url);
-                if (!string.IsNullOrWhiteSpace(url))
+                // Stream tokens as they arrive (much faster perceived latency).
+                SetStatus("working", "Streaming answer…");
+                var sb = new StringBuilder();
+                var answer = await _api.StreamRunAsync(
+                    agentId,
+                    runId,
+                    token =>
+                    {
+                        sb.Append(token);
+                        SetAnswerText(sb.ToString());
+                    },
+                    _cts.Token).ConfigureAwait(true);
+
+                if (string.IsNullOrWhiteSpace(answer) && sb.Length > 0)
                 {
-                    if (answer.Length > 0)
-                    {
-                        answer = answer + Environment.NewLine + Environment.NewLine + "URL: " + url;
-                    }
-                    else
-                    {
-                        answer = "URL: " + url;
-                    }
+                    answer = sb.ToString();
+                }
+
+                if (!string.IsNullOrWhiteSpace(_currentAgentUrl))
+                {
+                    answer = answer + Environment.NewLine + Environment.NewLine + "URL: " + _currentAgentUrl;
                 }
 
                 _txtAnswer.Text = answer;
@@ -292,6 +330,66 @@ namespace CursorDesk.App
             catch (Exception ex)
             {
                 SetStatus("error", "Saved answer, but history write failed: " + ex.Message);
+            }
+        }
+
+        private void SetAnswerText(string text)
+        {
+            if (_txtAnswer.InvokeRequired)
+            {
+                try
+                {
+                    _txtAnswer.Invoke((Action)(() => { _txtAnswer.Text = text; }));
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+            else
+            {
+                _txtAnswer.Text = text;
+            }
+        }
+
+        private void EnsureStore()
+        {
+            if (_store == null)
+            {
+                _store = SqliteStore.CreateDefault();
+            }
+        }
+
+        private string LoadCurrentAgentId()
+        {
+            EnsureStore();
+            var id = _store.GetSetting(SettingAgentId);
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                _currentAgentId = id;
+                _currentAgentUrl = _store.GetSetting(SettingAgentUrl) ?? string.Empty;
+            }
+
+            return id;
+        }
+
+        private void SaveCurrentAgent()
+        {
+            EnsureStore();
+            _store.SetSetting(SettingAgentId, _currentAgentId);
+            _store.SetSetting(SettingAgentUrl, _currentAgentUrl);
+        }
+
+        private async Task<bool> IsAgentReusableAsync(string agentId)
+        {
+            try
+            {
+                var agent = await _api.GetAgentAsync(agentId, _cts.Token).ConfigureAwait(true);
+                return agent != null && agent.IsReusable();
+            }
+            catch (CursorApiException)
+            {
+                // 404 / expired / any error → treat as not reusable.
+                return false;
             }
         }
 

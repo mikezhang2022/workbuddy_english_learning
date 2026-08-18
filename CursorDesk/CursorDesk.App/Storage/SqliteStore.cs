@@ -34,6 +34,34 @@ namespace CursorDesk.Storage
             return new SqliteStore(path);
         }
 
+        /// <summary>
+        /// Persisted agent id for warm reuse across sessions (skip VM cold start).
+        /// </summary>
+        public string GetSetting(string key)
+        {
+            using (var conn = Open())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT Value FROM Settings WHERE Key = @key";
+                Add(cmd, "@key", key);
+                var value = cmd.ExecuteScalar();
+                return value == null || value == DBNull.Value ? null : Convert.ToString(value);
+            }
+        }
+
+        public void SetSetting(string key, string value)
+        {
+            using (var conn = Open())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText =
+                    "INSERT OR REPLACE INTO Settings (Key, Value) VALUES (@key, @value)";
+                Add(cmd, "@key", key);
+                Add(cmd, "@value", value ?? string.Empty);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         public long Insert(Session session)
         {
             if (session == null)
@@ -91,6 +119,10 @@ namespace CursorDesk.Storage
                     "Prompt TEXT, " +
                     "Result TEXT, " +
                     "CreatedAt TEXT" +
+                    ");" +
+                    "CREATE TABLE IF NOT EXISTS Settings (" +
+                    "Key TEXT PRIMARY KEY, " +
+                    "Value TEXT" +
                     ");";
                 cmd.ExecuteNonQuery();
             }
