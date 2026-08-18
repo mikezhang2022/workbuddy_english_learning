@@ -18,9 +18,11 @@ namespace CursorDesk.App
         private TextBox _txtPrompt;
         private Button _btnSend;
         private GroupBox _grpAnswer;
-        private TextBox _txtAnswer;
+        private RichTextBox _txtAnswer;
         private GroupBox _grpHistory;
         private ListView _lvSessions;
+        private Label _lblRepo;
+        private TextBox _txtRepo;
 
         protected override void Dispose(bool disposing)
         {
@@ -49,9 +51,11 @@ namespace CursorDesk.App
             _txtPrompt = new TextBox();
             _btnSend = new Button();
             _grpAnswer = new GroupBox();
-            _txtAnswer = new TextBox();
+            _txtAnswer = new RichTextBox();
             _grpHistory = new GroupBox();
             _lvSessions = new ListView();
+            _lblRepo = new Label();
+            _txtRepo = new TextBox();
             _root.SuspendLayout();
             _toolbar.SuspendLayout();
             _grpPrompt.SuspendLayout();
@@ -64,13 +68,14 @@ namespace CursorDesk.App
             _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             _root.Dock = DockStyle.Fill;
             _root.Padding = new Padding(10);
-            _root.RowCount = 6;
+            _root.RowCount = 7;
             _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
             _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 35F));
+            _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 33F));
             _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
-            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 40F));
-            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 25F));
+            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 38F));
+            _root.RowStyles.Add(new RowStyle(SizeType.Percent, 23F));
 
             _toolbar.Dock = DockStyle.Fill;
             _btnValidate.Text = "Validate Key";
@@ -101,6 +106,31 @@ namespace CursorDesk.App
             _cmbModel.DropDownStyle = ComboBoxStyle.DropDownList;
             _cmbModel.IntegralHeight = false;
 
+            _lblRepo.Text = "GitHub";
+            _lblRepo.TextAlign = ContentAlignment.MiddleLeft;
+            _lblRepo.Dock = DockStyle.Fill;
+
+            _txtRepo.Dock = DockStyle.Fill;
+            _txtRepo.Font = new Font("Segoe UI", 9F);
+            _txtRepo.Text = "https://github.com/mikezhang2022/workbuddy_english_learning";
+            _txtRepo.ForeColor = SystemColors.GrayText;
+            _txtRepo.Enter += (s, e) =>
+            {
+                if (_txtRepo.Text == "https://github.com/mikezhang2022/workbuddy_english_learning")
+                {
+                    _txtRepo.Text = string.Empty;
+                    _txtRepo.ForeColor = Color.Black;
+                }
+            };
+            _txtRepo.Leave += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(_txtRepo.Text))
+                {
+                    _txtRepo.Text = "https://github.com/mikezhang2022/workbuddy_english_learning";
+                    _txtRepo.ForeColor = SystemColors.GrayText;
+                }
+            };
+
             _grpPrompt.Text = "Prompt";
             _grpPrompt.Dock = DockStyle.Fill;
             _txtPrompt.Multiline = true;
@@ -118,10 +148,12 @@ namespace CursorDesk.App
             _grpAnswer.Dock = DockStyle.Fill;
             _txtAnswer.Multiline = true;
             _txtAnswer.ReadOnly = true;
-            _txtAnswer.ScrollBars = ScrollBars.Vertical;
+            _txtAnswer.ScrollBars = RichTextBoxScrollBars.Vertical;
             _txtAnswer.Dock = DockStyle.Fill;
             _txtAnswer.BackColor = Color.White;
             _txtAnswer.Font = new Font("Segoe UI", 10F);
+            _txtAnswer.WordWrap = true;
+            _txtAnswer.DetectUrls = false;
             _grpAnswer.Controls.Add(_txtAnswer);
 
             _grpHistory.Text = "Session history (double-click to reload)";
@@ -141,13 +173,15 @@ namespace CursorDesk.App
             _root.SetColumnSpan(_toolbar, 2);
             _root.Controls.Add(_lblModel, 0, 1);
             _root.Controls.Add(_cmbModel, 1, 1);
-            _root.Controls.Add(_grpPrompt, 0, 2);
+            _root.Controls.Add(_lblRepo, 0, 2);
+            _root.Controls.Add(_txtRepo, 1, 2);
+            _root.Controls.Add(_grpPrompt, 0, 3);
             _root.SetColumnSpan(_grpPrompt, 2);
-            _root.Controls.Add(_btnSend, 0, 3);
+            _root.Controls.Add(_btnSend, 0, 4);
             _root.SetColumnSpan(_btnSend, 2);
-            _root.Controls.Add(_grpAnswer, 0, 4);
+            _root.Controls.Add(_grpAnswer, 0, 5);
             _root.SetColumnSpan(_grpAnswer, 2);
-            _root.Controls.Add(_grpHistory, 0, 5);
+            _root.Controls.Add(_grpHistory, 0, 6);
             _root.SetColumnSpan(_grpHistory, 2);
 
             AutoScaleDimensions = new SizeF(7F, 15F);

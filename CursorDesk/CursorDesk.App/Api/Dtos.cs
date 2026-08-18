@@ -69,6 +69,15 @@ namespace CursorDesk.Api
         public object[] Params { get; set; }
     }
 
+    public sealed class RepoSpec
+    {
+        [JsonProperty("url")]
+        public string Url { get; set; }
+
+        [JsonProperty("startingRef")]
+        public string StartingRef { get; set; }
+    }
+
     public sealed class AgentCreateRequest
     {
         [JsonProperty("prompt")]
@@ -79,6 +88,13 @@ namespace CursorDesk.Api
 
         [JsonProperty("autoCreatePR")]
         public bool AutoCreatePR { get; set; }
+
+        /// <summary>
+        /// GitHub repos. Cursor commits generated files to a cursor/* branch and
+        /// (with autoCreatePR) opens a PR. Format is an array of {url, startingRef} objects.
+        /// </summary>
+        [JsonProperty("repos")]
+        public List<RepoSpec> Repos { get; set; }
     }
 
     public sealed class AgentCreateResponseWrapper

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -82,7 +83,8 @@ namespace CursorDesk.Api
         public async Task<AgentCreateResponse> CreateAgentAsync(
             string promptText,
             string modelId,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IList<string> repos = null)
         {
             if (string.IsNullOrWhiteSpace(promptText))
             {
@@ -94,10 +96,20 @@ namespace CursorDesk.Api
                 modelId = DefaultModelId;
             }
 
-            // Q&A only: no repos field. model.params MUST be [] — never param objects.
+            // When a repo is connected, instruct Cursor to drop any generated files
+            // into the source/ folder and commit them so they land on GitHub.
+            var finalPrompt = promptText;
+            if (repos != null && repos.Count > 0)
+            {
+                finalPrompt = promptText.TrimEnd() +
+                    "\n\n[SYSTEM] If you create or generate any files (images, code, documents, etc.), " +
+                    "save them into a folder named `source/` at the repository root and commit them. " +
+                    "Do not skip the commit step.";
+            }
+
             var body = new AgentCreateRequest
             {
-                Prompt = new PromptBody { Text = promptText },
+                Prompt = new PromptBody { Text = finalPrompt },
                 Model = new ModelSpec
                 {
                     Id = modelId,
@@ -105,6 +117,12 @@ namespace CursorDesk.Api
                 },
                 AutoCreatePR = true
             };
+
+            if (repos != null && repos.Count > 0)
+            {
+                body.Repos = new List<RepoSpec>(
+                    repos.Select(r => new RepoSpec { Url = r, StartingRef = "main" }));
+            }
 
             var json = JsonConvert.SerializeObject(body, JsonSettings);
             var raw = await SendRawAsync(
@@ -172,7 +190,8 @@ namespace CursorDesk.Api
             string agentId,
             string promptText,
             string modelId,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IList<string> repos = null)
         {
             if (string.IsNullOrWhiteSpace(agentId))
             {
@@ -189,9 +208,18 @@ namespace CursorDesk.Api
                 modelId = DefaultModelId;
             }
 
+            var finalPrompt = promptText;
+            if (repos != null && repos.Count > 0)
+            {
+                finalPrompt = promptText.TrimEnd() +
+                    "\n\n[SYSTEM] If you create or generate any files (images, code, documents, etc.), " +
+                    "save them into a folder named `source/` at the repository root and commit them. " +
+                    "Do not skip the commit step.";
+            }
+
             var body = new RunCreateRequest
             {
-                Prompt = new PromptBody { Text = promptText },
+                Prompt = new PromptBody { Text = finalPrompt },
                 Model = new ModelSpec
                 {
                     Id = modelId,

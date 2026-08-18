@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -19,8 +21,12 @@ namespace CursorDesk.App
         private bool _busy;
         private string _currentAgentId = string.Empty;
         private string _currentAgentUrl = string.Empty;
+        private string _currentBranch = string.Empty;
         private const string SettingAgentId = "currentAgentId";
         private const string SettingAgentUrl = "currentAgentUrl";
+        private const string SettingRepoUrl = "repoUrl";
+        private const string SettingBranch = "currentBranch";
+        private const string DefaultRepoUrl = "https://github.com/mikezhang2022/workbuddy_english_learning";
 
         public MainForm()
         {
@@ -68,6 +74,40 @@ namespace CursorDesk.App
 
             _api = new CursorApiClient(key);
             await LoadModelsAsync().ConfigureAwait(true);
+
+            LoadRepoUrl();
+            _ = PreWarmAgentAsync();
+        }
+
+        private void LoadRepoUrl()
+        {
+            EnsureStore();
+            try
+            {
+                var saved = _store.GetSetting(SettingRepoUrl);
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    _txtRepo.Text = saved;
+                    _txtRepo.ForeColor = Color.Black;
+                }
+            }
+            catch (Exception)
+            {
+                // Keep the default placeholder.
+            }
+        }
+
+        private void SaveRepoUrl(string repoUrl)
+        {
+            EnsureStore();
+            try
+            {
+                _store.SetSetting(SettingRepoUrl, repoUrl ?? string.Empty);
+            }
+            catch (Exception)
+            {
+                // Non-fatal.
+            }
         }
 
         private void LoadLocalHistory()
@@ -230,6 +270,18 @@ namespace CursorDesk.App
                 _txtAnswer.Text = string.Empty;
                 EnsureStore();
 
+                // Resolve the GitHub repo (if any) so generated files land there under source/.
+                var repoUrl = (_txtRepo.Text ?? string.Empty).Trim();
+                if (!GitHubHelper.TryParseRepoUrl(repoUrl, out _, out _))
+                {
+                    repoUrl = string.Empty;
+                }
+
+                SaveRepoUrl(repoUrl);
+                var repos = string.IsNullOrWhiteSpace(repoUrl)
+                    ? null
+                    : new List<string> { repoUrl };
+
                 // Try to reuse a warm agent (skip VM cold start) if we have one stored.
                 string agentId = LoadCurrentAgentId();
                 if (!string.IsNullOrWhiteSpace(agentId) && !await IsAgentReusableAsync(agentId).ConfigureAwait(true))
@@ -242,7 +294,7 @@ namespace CursorDesk.App
                 {
                     // First call (or previous agent expired): pay the cold start once.
                     SetStatus("working", "Starting agent (first call is slower)…");
-                    var created = await _api.CreateAgentAsync(prompt, modelId, _cts.Token).ConfigureAwait(true);
+                    var created = await _api.CreateAgentAsync(prompt, modelId, _cts.Token, repos).ConfigureAwait(true);
                     if (created == null || string.IsNullOrWhiteSpace(created.Id))
                     {
                         throw new CursorApiException("Create agent returned no id.");
@@ -258,7 +310,7 @@ namespace CursorDesk.App
                 {
                     // Warm reuse: no VM cold start.
                     SetStatus("working", "Reusing agent…");
-                    var run = await _api.CreateRunAsync(agentId, prompt, modelId, _cts.Token).ConfigureAwait(true);
+                    var run = await _api.CreateRunAsync(agentId, prompt, modelId, _cts.Token, repos).ConfigureAwait(true);
                     runId = run == null ? null : run.Id;
                 }
 
@@ -290,7 +342,32 @@ namespace CursorDesk.App
                     answer = answer + Environment.NewLine + Environment.NewLine + "URL: " + _currentAgentUrl;
                 }
 
-                _txtAnswer.Text = answer;
+                // If a repo was connected, resolve the GitHub source/ folder and surface it.
+                if (!string.IsNullOrWhiteSpace(repoUrl))
+                {
+                    // Cursor reports the branch name (e.g. "cursor/source-hello-file-f6ea")
+                    // inside the run result text. Parse it; fall back to the stored branch
+                    // when reusing a warm agent.
+                    var branch = GitHubHelper.ParseBranchName(answer);
+                    if (string.IsNullOrWhiteSpace(branch) && !string.IsNullOrWhiteSpace(_currentBranch))
+                    {
+                        branch = _currentBranch;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(branch))
+                    {
+                        _currentBranch = branch;
+                        SaveBranch();
+                        var sourceUrl = GitHubHelper.BuildSourceUrl(repoUrl, branch);
+                        if (!string.IsNullOrWhiteSpace(sourceUrl))
+                        {
+                            answer = answer + Environment.NewLine + Environment.NewLine +
+                                     "GitHub files: " + sourceUrl;
+                        }
+                    }
+                }
+
+                _txtAnswer.Text = FormatAnswer(answer);
                 SaveSession(modelId, prompt, answer);
                 SetStatus("done", "Finished.");
             }
@@ -335,11 +412,12 @@ namespace CursorDesk.App
 
         private void SetAnswerText(string text)
         {
+            var formatted = FormatAnswer(text);
             if (_txtAnswer.InvokeRequired)
             {
                 try
                 {
-                    _txtAnswer.Invoke((Action)(() => { _txtAnswer.Text = text; }));
+                    _txtAnswer.Invoke((Action)(() => { _txtAnswer.Text = formatted; }));
                 }
                 catch (ObjectDisposedException)
                 {
@@ -347,8 +425,45 @@ namespace CursorDesk.App
             }
             else
             {
-                _txtAnswer.Text = text;
+                _txtAnswer.Text = formatted;
             }
+        }
+
+        /// <summary>
+        /// Cleans up the raw answer text for display:
+        /// - Strips the "URL: ..." suffix if present
+        /// - Collapses 3+ consecutive newlines into 2 (paragraph break)
+        /// - Trims leading/trailing whitespace
+        /// </summary>
+        private static string FormatAnswer(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            // Strip "URL: ..." line that Cursor appends.
+            var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var cleaned = new List<string>();
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("URL:", StringComparison.OrdinalIgnoreCase) &&
+                    trimmed.Length > 4)
+                {
+                    continue;
+                }
+
+                cleaned.Add(line);
+            }
+
+            var result = string.Join(Environment.NewLine, cleaned);
+
+            // Collapse 3+ blank lines into a double newline (paragraph break).
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result, @"(\r?\n\s*){3,}", Environment.NewLine + Environment.NewLine);
+
+            return result.Trim();
         }
 
         private void EnsureStore()
@@ -367,6 +482,7 @@ namespace CursorDesk.App
             {
                 _currentAgentId = id;
                 _currentAgentUrl = _store.GetSetting(SettingAgentUrl) ?? string.Empty;
+                _currentBranch = _store.GetSetting(SettingBranch) ?? string.Empty;
             }
 
             return id;
@@ -377,6 +493,20 @@ namespace CursorDesk.App
             EnsureStore();
             _store.SetSetting(SettingAgentId, _currentAgentId);
             _store.SetSetting(SettingAgentUrl, _currentAgentUrl);
+            _store.SetSetting(SettingBranch, _currentBranch);
+        }
+
+        private void SaveBranch()
+        {
+            EnsureStore();
+            try
+            {
+                _store.SetSetting(SettingBranch, _currentBranch);
+            }
+            catch (Exception)
+            {
+                // Non-fatal.
+            }
         }
 
         private async Task<bool> IsAgentReusableAsync(string agentId)
@@ -390,6 +520,69 @@ namespace CursorDesk.App
             {
                 // 404 / expired / any error → treat as not reusable.
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Pre-warms a agent in background so the first real question reuses it
+        /// and skips the ~60s VM cold start. Fire-and-forget from MainForm_Load.
+        /// </summary>
+        private async Task PreWarmAgentAsync()
+        {
+            try
+            {
+                await Task.Delay(2000, _cts.Token).ConfigureAwait(true);
+
+                var storedId = LoadCurrentAgentId();
+                if (!string.IsNullOrWhiteSpace(storedId) && await IsAgentReusableAsync(storedId).ConfigureAwait(true))
+                {
+                    _currentAgentId = storedId;
+                    _currentAgentUrl = _store.GetSetting(SettingAgentUrl) ?? string.Empty;
+                    _currentBranch = _store.GetSetting(SettingBranch) ?? string.Empty;
+                    SetStatus("idle", "Ready.");
+                    return;
+                }
+
+                SetStatus("working", "Warming up agent (first call prepares it)…");
+
+                // If the user configured a GitHub repo, warm with it too so the first real
+                // (repo-bound) prompt reuses this agent instead of incurring a second cold start.
+                var warmRepo = (_txtRepo.Text ?? string.Empty).Trim();
+                if (!GitHubHelper.TryParseRepoUrl(warmRepo, out _, out _))
+                {
+                    warmRepo = string.Empty;
+                }
+
+                var warmRepos = string.IsNullOrWhiteSpace(warmRepo)
+                    ? null
+                    : new List<string> { warmRepo };
+
+                var created = await _api.CreateAgentAsync(
+                    "Reply with exactly: OK",
+                    CursorApiClient.DefaultModelId,
+                    _cts.Token,
+                    warmRepos).ConfigureAwait(true);
+
+                if (created != null && !string.IsNullOrWhiteSpace(created.Id))
+                {
+                    _currentAgentId = created.Id;
+                    _currentAgentUrl = created.Url ?? string.Empty;
+                    SaveCurrentAgent();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception)
+            {
+                // Non-fatal: user will just experience cold start on first Send.
+            }
+            finally
+            {
+                if (!_busy)
+                {
+                    SetStatus("idle", "Ready.");
+                }
             }
         }
 
