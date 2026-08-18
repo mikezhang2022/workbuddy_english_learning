@@ -77,7 +77,7 @@ namespace CursorDesk.Api
             return response.Items;
         }
 
-        public Task<AgentCreateResponse> CreateAgentAsync(
+        public async Task<AgentCreateResponse> CreateAgentAsync(
             string promptText,
             string modelId,
             CancellationToken cancellationToken)
@@ -105,7 +105,7 @@ namespace CursorDesk.Api
             };
 
             var json = JsonConvert.SerializeObject(body, JsonSettings);
-            var raw = await SendRawAsync<string>(
+            var raw = await SendRawAsync(
                 HttpMethod.Post,
                 "v1/agents",
                 json,
@@ -203,7 +203,7 @@ namespace CursorDesk.Api
             HttpStatusCode expectedStatus,
             CancellationToken cancellationToken)
         {
-            var body = await SendRawAsync<string>(method, relativePath, jsonBody, expectedStatus, cancellationToken).ConfigureAwait(false);
+            var body = await SendRawAsync(method, relativePath, jsonBody, expectedStatus, cancellationToken).ConfigureAwait(false);
             return Deserialize<T>(body);
         }
 
@@ -211,7 +211,7 @@ namespace CursorDesk.Api
         /// Sends an HTTP request and returns the raw response body as a string.
         /// Used when the caller needs to do custom deserialization (e.g. wrapped responses).
         /// </summary>
-        private async Task<string> SendRawAsync<T>(
+        private async Task<string> SendRawAsync(
             HttpMethod method,
             string relativePath,
             string jsonBody,
@@ -249,7 +249,7 @@ namespace CursorDesk.Api
             {
                 var body = await ReadBodyAsync(response).ConfigureAwait(false);
                 ThrowIfFailed(response, body, expectedStatus);
-                return Deserialize<T>(body);
+                return body;
             }
         }
 
