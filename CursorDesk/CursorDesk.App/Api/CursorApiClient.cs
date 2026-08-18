@@ -40,10 +40,12 @@ namespace CursorDesk.Api
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             };
 
+            // HttpClient timeout: POST /v1/agents can take >60s when server is busy.
+            // 180s gives enough margin; polling (PollUntilFinished) has its own 10min ceiling.
             _http = new HttpClient(handler)
             {
                 BaseAddress = new Uri(BaseUrl),
-                Timeout = TimeSpan.FromSeconds(60)
+                Timeout = TimeSpan.FromSeconds(180)
             };
 
             var token = Convert.ToBase64String(Encoding.UTF8.GetBytes(apiKey + ":"));
