@@ -337,17 +337,10 @@ namespace CursorDesk.App
                     answer = sb.ToString();
                 }
 
-                if (!string.IsNullOrWhiteSpace(_currentAgentUrl))
-                {
-                    answer = answer + Environment.NewLine + Environment.NewLine + "URL: " + _currentAgentUrl;
-                }
-
-                // If a repo was connected, resolve the GitHub source/ folder and surface it.
+                // If a repo was connected, silently save the branch for future use
+                // but do NOT clutter the answer with URLs.
                 if (!string.IsNullOrWhiteSpace(repoUrl))
                 {
-                    // Cursor reports the branch name (e.g. "cursor/source-hello-file-f6ea")
-                    // inside the run result text. Parse it; fall back to the stored branch
-                    // when reusing a warm agent.
                     var branch = GitHubHelper.ParseBranchName(answer);
                     if (string.IsNullOrWhiteSpace(branch) && !string.IsNullOrWhiteSpace(_currentBranch))
                     {
@@ -358,16 +351,11 @@ namespace CursorDesk.App
                     {
                         _currentBranch = branch;
                         SaveBranch();
-                        var sourceUrl = GitHubHelper.BuildSourceUrl(repoUrl, branch);
-                        if (!string.IsNullOrWhiteSpace(sourceUrl))
-                        {
-                            answer = answer + Environment.NewLine + Environment.NewLine +
-                                     "GitHub files: " + sourceUrl;
-                        }
                     }
                 }
 
-                _txtAnswer.Text = FormatAnswer(answer);
+                try { _txtAnswer.Rtf = FormatAnswer(answer); }
+                catch { _txtAnswer.Text = answer; /* fallback if RTF is malformed */ }
                 SaveSession(modelId, prompt, answer);
                 SetStatus("done", "Finished.");
             }
@@ -412,12 +400,16 @@ namespace CursorDesk.App
 
         private void SetAnswerText(string text)
         {
-            var formatted = FormatAnswer(text);
+            var rtf = FormatAnswer(text);
             if (_txtAnswer.InvokeRequired)
             {
                 try
                 {
-                    _txtAnswer.Invoke((Action)(() => { _txtAnswer.Text = formatted; }));
+                    _txtAnswer.Invoke((Action)(() =>
+                    {
+                        try { _txtAnswer.Rtf = rtf; }
+                        catch { _txtAnswer.Text = text; /* fallback */ }
+                    }));
                 }
                 catch (ObjectDisposedException)
                 {
@@ -425,15 +417,15 @@ namespace CursorDesk.App
             }
             else
             {
-                _txtAnswer.Text = formatted;
+                try { _txtAnswer.Rtf = rtf; }
+                catch { _txtAnswer.Text = text; /* fallback */ }
             }
         }
 
         /// <summary>
-        /// Cleans up the raw answer text for display:
-        /// - Strips the "URL: ..." suffix if present
-        /// - Collapses 3+ consecutive newlines into 2 (paragraph break)
-        /// - Trims leading/trailing whitespace
+        /// Converts raw markdown-ish answer text into RichTextBox-friendly formatted text.
+        /// Handles: **bold**, ## / ### headings, --- rules, | tables, > blockquotes,
+        /// - / * lists, and code spans. Outputs RTF for the RichTextBox.
         /// </summary>
         private static string FormatAnswer(string text)
         {
@@ -442,28 +434,265 @@ namespace CursorDesk.App
                 return string.Empty;
             }
 
-            // Strip "URL: ..." line that Cursor appends.
+            // Strip any "URL:" or "GitHub files:" lines that may have been saved previously.
             var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             var cleaned = new List<string>();
             foreach (var line in lines)
             {
                 var trimmed = line.Trim();
-                if (trimmed.StartsWith("URL:", StringComparison.OrdinalIgnoreCase) &&
-                    trimmed.Length > 4)
+                if (trimmed.StartsWith("URL:", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith("GitHub files:", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
-
                 cleaned.Add(line);
             }
 
-            var result = string.Join(Environment.NewLine, cleaned);
+            // Rejoin and collapse 3+ blank lines into 2.
+            var raw = string.Join(Environment.NewLine, cleaned);
+            raw = Regex.Replace(raw, @"(\r?\n\s*){3,}", Environment.NewLine + Environment.NewLine);
 
-            // Collapse 3+ blank lines into a double newline (paragraph break).
-            result = System.Text.RegularExpressions.Regex.Replace(
-                result, @"(\r?\n\s*){3,}", Environment.NewLine + Environment.NewLine);
+            return MarkdownToRtf(raw);
+        }
 
-            return result.Trim();
+        /// <summary>
+        /// Converts a subset of Markdown to RTF so the RichTextBox can render
+        /// bold, headings, tables, lists, etc.
+        /// </summary>
+        private static string MarkdownToRtf(string md)
+        {
+            var rtf = new StringBuilder();
+            rtf.Append(@"{\rtf1\ansi\ansicpg936\deff0\nouicompat\deflang1033\deflangfe2052");
+            rtf.Append(@"{\fonttbl{\f0\fnil\fcharset134 \'b9\'a4\'c8\'a1\'ba\'c3\'b2\'b5;}}");
+            rtf.Append(@"{\colortbl;\red0\green0\blue0;\red100\green100\blue100;\red0\green70\blue150;}");
+            rtf.Append(@"\viewkind4\uc1\pard\f0\fs22");
+
+            var mdLines = md.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var i = 0;
+            while (i < mdLines.Length)
+            {
+                var line = mdLines[i];
+                var trimmed = line.Trim();
+
+                // Blank line → paragraph break
+                if (trimmed.Length == 0)
+                {
+                    rtf.Append(@"\par");
+                    i++;
+                    continue;
+                }
+
+                // Horizontal rule ---
+                if (trimmed == "---" || trimmed == "***" || trimmed == "___")
+                {
+                    rtf.Append(@"\pard\brdrb\brdrs\brdrw10\brsp20 \par");
+                    i++;
+                    continue;
+                }
+
+                // Heading 1 #
+                if (trimmed.StartsWith("# ") && !trimmed.StartsWith("## "))
+                {
+                    var headingText = trimmed.Substring(2).Trim();
+                    rtf.Append(@"\pard\b\fs28 ");
+                    rtf.Append(RtfEscape(headingText));
+                    rtf.Append(@"\b0\fs22\par");
+                    i++;
+                    continue;
+                }
+
+                // Heading 2 ##
+                if (trimmed.StartsWith("## ") && !trimmed.StartsWith("### "))
+                {
+                    var headingText = trimmed.Substring(3).Trim();
+                    rtf.Append(@"\pard\b\fs24 ");
+                    rtf.Append(RtfEscape(headingText));
+                    rtf.Append(@"\b0\fs22\par");
+                    i++;
+                    continue;
+                }
+
+                // Heading 3 ###
+                if (trimmed.StartsWith("### "))
+                {
+                    var headingText = trimmed.Substring(4).Trim();
+                    rtf.Append(@"\pard\b\fs22 ");
+                    rtf.Append(RtfEscape(headingText));
+                    rtf.Append(@"\b0\par");
+                    i++;
+                    continue;
+                }
+
+                // Blockquote >
+                if (trimmed.StartsWith("> "))
+                {
+                    var quoteText = trimmed.Substring(2).Trim();
+                    rtf.Append(@"\pard\li200\cf2\i ");
+                    rtf.Append(RtfEscape(ProcessInlineFormatting(quoteText)));
+                    rtf.Append(@"\i0\cf0\li0\par");
+                    i++;
+                    continue;
+                }
+
+                // Table row | ... |
+                if (trimmed.Contains("|") && IsTableRow(trimmed))
+                {
+                    // Collect consecutive table rows
+                    var tableRows = new List<string>();
+                    while (i < mdLines.Length && IsTableRow(mdLines[i].Trim()))
+                    {
+                        var rowTrimmed = mdLines[i].Trim();
+                        // Skip separator row like |---|---|
+                        if (Regex.IsMatch(rowTrimmed, @"^\|[\s\-:|]+\|$"))
+                        {
+                            i++;
+                            continue;
+                        }
+                        tableRows.Add(rowTrimmed);
+                        i++;
+                    }
+
+                    if (tableRows.Count > 0)
+                    {
+                        RenderTableRtf(rtf, tableRows);
+                    }
+                    continue;
+                }
+
+                // Unordered list - / *
+                if ((trimmed.StartsWith("- ") || trimmed.StartsWith("* ")) && !trimmed.StartsWith("***"))
+                {
+                    rtf.Append(@"\pard\li200\bullet ");
+                    rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed.Substring(2).Trim())));
+                    rtf.Append(@"\li0\par");
+                    i++;
+                    continue;
+                }
+
+                // Ordered list 1. 2. etc.
+                if (Regex.IsMatch(trimmed, @"^\d+\.\s+"))
+                {
+                    var match = Regex.Match(trimmed, @"^(\d+)\.\s+");
+                    rtf.Append(@"\pard\li200 ");
+                    rtf.Append(RtfEscape(match.Groups[1].Value + ". "));
+                    rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed.Substring(match.Length).Trim())));
+                    rtf.Append(@"\li0\par");
+                    i++;
+                    continue;
+                }
+
+                // Regular paragraph with inline formatting
+                rtf.Append(@"\pard ");
+                rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed)));
+                rtf.Append(@"\par");
+                i++;
+            }
+
+            rtf.Append("}");
+            return rtf.ToString();
+        }
+
+        private static bool IsTableRow(string line)
+        {
+            var trimmed = line.Trim();
+            return trimmed.StartsWith("|") && trimmed.EndsWith("|") && trimmed.Length > 2;
+        }
+
+        private static void RenderTableRtf(StringBuilder rtf, List<string> rows)
+        {
+            // Parse all cells to find max columns
+            var allCells = new List<List<string>>();
+            int maxCols = 0;
+            foreach (var row in rows)
+            {
+                var cells = ParseTableCells(row);
+                allCells.Add(cells);
+                if (cells.Count > maxCols) maxCols = cells.Count;
+            }
+
+            // Simple table rendering: each row on its own line with tab-like spacing
+            foreach (var rowCells in allCells)
+            {
+                rtf.Append(@"\pard\li100 ");
+                for (int c = 0; c < rowCells.Count; c++)
+                {
+                    if (c > 0) rtf.Append(@"\tab ");
+                    // Header row (first row) is bold
+                    if (allCells.IndexOf(rowCells) == 0)
+                        rtf.Append(@"\b");
+                    rtf.Append(RtfEscape(ProcessInlineFormatting(rowCells[c].Trim())));
+                    if (allCells.IndexOf(rowCells) == 0)
+                        rtf.Append(@"\b0");
+                }
+                rtf.Append(@"\li0\par");
+            }
+            // Add a light border line after table
+            rtf.Append(@"\pard\brdrb\brdrs\brdrw10\brsp20 \par");
+        }
+
+        private static List<string> ParseTableCells(string row)
+        {
+            var cells = new List<string>();
+            var inner = row.Trim().Trim('|');
+            var parts = inner.Split('|');
+            foreach (var p in parts)
+            {
+                cells.Add(p.Trim());
+            }
+            return cells;
+        }
+
+        /// <summary>
+        /// Processes inline markdown: **bold**, *italic*, `code`
+        /// </summary>
+        private static string ProcessInlineFormatting(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // Process code spans first (backticks) to protect them from bold processing
+            text = Regex.Replace(text, @"`([^`]+)`", m => "\\f2\\fs20 " + RtfEscape(m.Groups[1].Value) + "\\f0\\fs22");
+
+            // Process bold **text**
+            text = Regex.Replace(text, @"\*\*([^*]+)\*\*", m => "\\b " + m.Groups[1].Value + "\\b0 ");
+
+            // Process italic *text* (but not ** which is already handled)
+            text = Regex.Replace(text, @"(?<!\*)\*([^*]+)\*(?!\*)", m => "\\i " + m.Groups[1].Value + "\\i0 ");
+
+            return text;
+        }
+
+        private static string RtfEscape(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            var sb = new StringBuilder(s.Length * 2);
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '\\': sb.Append("\\\\"); break;
+                    case '{': sb.Append("\\{"); break;
+                    case '}': sb.Append("\\}"); break;
+                    case '\t': sb.Append("\\tab "); break;
+                    case '\n': sb.Append("\\par "); break;
+                    case '\r': break;
+                    default:
+                        if (c >= 0x00 && c <= 0x1f)
+                        {
+                            sb.AppendFormat("\\'{0:x2}", (int)c);
+                        }
+                        else if (c > 127)
+                        {
+                            // Unicode escape for CJK characters
+                            sb.AppendFormat("\\u{0}?", (int)c);
+                        }
+                        else
+                        {
+                            sb.Append(c);
+                        }
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
         private void EnsureStore()
@@ -630,7 +859,9 @@ namespace CursorDesk.App
             }
 
             _txtPrompt.Text = session.Prompt ?? string.Empty;
-            _txtAnswer.Text = session.Result ?? string.Empty;
+            var resultText = session.Result ?? string.Empty;
+            try { _txtAnswer.Rtf = FormatAnswer(resultText); }
+            catch { _txtAnswer.Text = resultText; }
             if (!string.IsNullOrEmpty(session.Model))
             {
                 var index = _cmbModel.Items.IndexOf(session.Model);
