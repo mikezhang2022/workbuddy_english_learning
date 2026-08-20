@@ -440,9 +440,9 @@ namespace CursorDesk.App
         }
 
         /// <summary>
-        /// Converts raw markdown-ish answer text into RichTextBox-friendly formatted text.
-        /// Handles: **bold**, ## / ### headings, --- rules, | tables, > blockquotes,
-        /// - / * lists, and code spans. Outputs RTF for the RichTextBox.
+        /// Converts raw markdown-ish answer text into RichTextBox RTF.
+        /// Handles: **bold**, *italic*, ##/### headings, --- rules, | tables,
+        /// &gt; blockquotes, -/* lists, ```fenced code blocks``, and `inline code`.
         /// </summary>
         private static string FormatAnswer(string text)
         {
@@ -474,14 +474,14 @@ namespace CursorDesk.App
 
         /// <summary>
         /// Converts a subset of Markdown to RTF so the RichTextBox can render
-        /// bold, headings, tables, lists, etc.
+        /// bold, headings, code blocks, tables, lists, etc.
         /// </summary>
         private static string MarkdownToRtf(string md)
         {
             var rtf = new StringBuilder();
             rtf.Append(@"{\rtf1\ansi\ansicpg936\deff0\nouicompat\deflang1033\deflangfe2052");
-            rtf.Append(@"{\fonttbl{\f0\fnil\fcharset134 \'b9\'a4\'c8\'a1\'ba\'c3\'b2\'b5;}}");
-            rtf.Append(@"{\colortbl;\red0\green0\blue0;\red100\green100\blue100;\red0\green70\blue150;}");
+            rtf.Append(@"{\fonttbl{\f0\fnil\fcharset134 \'b9\'a4\'c8\'a1\'ba\'c3\'b2\'b5;}{\f1\fmodern\fcharset0 Courier New;}}");
+            rtf.Append(@"{\colortbl;\red0\green0\blue0;\red100\green100\blue100;\red240\green240\blue240;\red0\green100\blue0;}");
             rtf.Append(@"\viewkind4\uc1\pard\f0\fs22");
 
             var mdLines = md.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
@@ -496,6 +496,23 @@ namespace CursorDesk.App
                 {
                     rtf.Append(@"\par");
                     i++;
+                    continue;
+                }
+
+                // Fenced code block ```lang ... ```
+                if (trimmed.StartsWith("```"))
+                {
+                    i++; // skip opening ```
+                    var codeLines = new List<string>();
+                    while (i < mdLines.Length && !mdLines[i].Trim().StartsWith("```"))
+                    {
+                        codeLines.Add(mdLines[i]);
+                        i++;
+                    }
+                    // skip closing ```
+                    if (i < mdLines.Length) i++;
+
+                    RenderCodeBlock(rtf, codeLines);
                     continue;
                 }
 
@@ -545,7 +562,7 @@ namespace CursorDesk.App
                 {
                     var quoteText = trimmed.Substring(2).Trim();
                     rtf.Append(@"\pard\li200\cf2\i ");
-                    rtf.Append(RtfEscape(ProcessInlineFormatting(quoteText)));
+                    rtf.Append(ProcessInline(quoteText));
                     rtf.Append(@"\i0\cf0\li0\par");
                     i++;
                     continue;
@@ -554,12 +571,10 @@ namespace CursorDesk.App
                 // Table row | ... |
                 if (trimmed.Contains("|") && IsTableRow(trimmed))
                 {
-                    // Collect consecutive table rows
                     var tableRows = new List<string>();
                     while (i < mdLines.Length && IsTableRow(mdLines[i].Trim()))
                     {
                         var rowTrimmed = mdLines[i].Trim();
-                        // Skip separator row like |---|---|
                         if (Regex.IsMatch(rowTrimmed, @"^\|[\s\-:|]+\|$"))
                         {
                             i++;
@@ -568,7 +583,6 @@ namespace CursorDesk.App
                         tableRows.Add(rowTrimmed);
                         i++;
                     }
-
                     if (tableRows.Count > 0)
                     {
                         RenderTableRtf(rtf, tableRows);
@@ -580,7 +594,7 @@ namespace CursorDesk.App
                 if ((trimmed.StartsWith("- ") || trimmed.StartsWith("* ")) && !trimmed.StartsWith("***"))
                 {
                     rtf.Append(@"\pard\li200\bullet ");
-                    rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed.Substring(2).Trim())));
+                    rtf.Append(ProcessInline(trimmed.Substring(2).Trim()));
                     rtf.Append(@"\li0\par");
                     i++;
                     continue;
@@ -592,7 +606,7 @@ namespace CursorDesk.App
                     var match = Regex.Match(trimmed, @"^(\d+)\.\s+");
                     rtf.Append(@"\pard\li200 ");
                     rtf.Append(RtfEscape(match.Groups[1].Value + ". "));
-                    rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed.Substring(match.Length).Trim())));
+                    rtf.Append(ProcessInline(trimmed.Substring(match.Length).Trim()));
                     rtf.Append(@"\li0\par");
                     i++;
                     continue;
@@ -600,13 +614,57 @@ namespace CursorDesk.App
 
                 // Regular paragraph with inline formatting
                 rtf.Append(@"\pard ");
-                rtf.Append(RtfEscape(ProcessInlineFormatting(trimmed)));
+                rtf.Append(ProcessInline(trimmed));
                 rtf.Append(@"\par");
                 i++;
             }
 
             rtf.Append("}");
             return rtf.ToString();
+        }
+
+        /// <summary>
+        /// Renders a fenced code block with monospace font and light gray background.
+        /// </summary>
+        private static void RenderCodeBlock(StringBuilder rtf, List<string> codeLines)
+        {
+            rtf.Append(@"\pard\cb3\fi200\f1\fs20 ");
+            for (int c = 0; c < codeLines.Count; c++)
+            {
+                if (c > 0) rtf.Append(@"\par\pard\cb3\fi200\f1\fs20 ");
+                rtf.Append(RtfEscape(codeLines[c]));
+            }
+            rtf.Append(@"\par\pard\cb0\f0\fs22 ");
+        }
+
+        /// <summary>
+        /// Processes inline markdown: **bold**, *italic*, `code`.
+        /// IMPORTANT: Returns raw RTF commands mixed with escaped text.
+        /// The caller must NOT re-run RtfEscape on the result.
+        /// </summary>
+        private static string ProcessInline(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // Escape everything first so RTF special chars in content are safe
+            var safe = RtfEscape(text);
+
+            // Now replace the escaped markers with RTF commands.
+            // After RtfEscape: ** becomes \*\*, ` becomes \`
+
+            // Code spans `...`  (escaped backtick is \')
+            safe = Regex.Replace(safe, @"\\'([^\\']+)\\'", m =>
+                "\\f1\\fs20 " + m.Groups[1].Value + "\\f0\\fs22");
+
+            // Bold **...**  (escaped asterisk is \*)
+            safe = Regex.Replace(safe, @"\\\*\\\*([^\\\*]+)\\\*\\\*", m =>
+                "\\b " + m.Groups[1].Value + "\\b0 ");
+
+            // Italic *...* (not bold, so not preceded/followed by \*)
+            safe = Regex.Replace(safe, @"(?<!\\\*)\\\*([^\\\*]+)\\\*(?!\\\*)", m =>
+                "\\i " + m.Groups[1].Value + "\\i0 ");
+
+            return safe;
         }
 
         private static bool IsTableRow(string line)
@@ -617,7 +675,6 @@ namespace CursorDesk.App
 
         private static void RenderTableRtf(StringBuilder rtf, List<string> rows)
         {
-            // Parse all cells to find max columns
             var allCells = new List<List<string>>();
             int maxCols = 0;
             foreach (var row in rows)
@@ -627,23 +684,19 @@ namespace CursorDesk.App
                 if (cells.Count > maxCols) maxCols = cells.Count;
             }
 
-            // Simple table rendering: each row on its own line with tab-like spacing
-            foreach (var rowCells in allCells)
+            for (int r = 0; r < allCells.Count; r++)
             {
+                var rowCells = allCells[r];
                 rtf.Append(@"\pard\li100 ");
                 for (int c = 0; c < rowCells.Count; c++)
                 {
                     if (c > 0) rtf.Append(@"\tab ");
-                    // Header row (first row) is bold
-                    if (allCells.IndexOf(rowCells) == 0)
-                        rtf.Append(@"\b");
-                    rtf.Append(RtfEscape(ProcessInlineFormatting(rowCells[c].Trim())));
-                    if (allCells.IndexOf(rowCells) == 0)
-                        rtf.Append(@"\b0");
+                    if (r == 0) rtf.Append(@"\b");
+                    rtf.Append(ProcessInline(rowCells[c].Trim()));
+                    if (r == 0) rtf.Append(@"\b0");
                 }
                 rtf.Append(@"\li0\par");
             }
-            // Add a light border line after table
             rtf.Append(@"\pard\brdrb\brdrs\brdrw10\brsp20 \par");
         }
 
@@ -657,25 +710,6 @@ namespace CursorDesk.App
                 cells.Add(p.Trim());
             }
             return cells;
-        }
-
-        /// <summary>
-        /// Processes inline markdown: **bold**, *italic*, `code`
-        /// </summary>
-        private static string ProcessInlineFormatting(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return text;
-
-            // Process code spans first (backticks) to protect them from bold processing
-            text = Regex.Replace(text, @"`([^`]+)`", m => "\\f2\\fs20 " + RtfEscape(m.Groups[1].Value) + "\\f0\\fs22");
-
-            // Process bold **text**
-            text = Regex.Replace(text, @"\*\*([^*]+)\*\*", m => "\\b " + m.Groups[1].Value + "\\b0 ");
-
-            // Process italic *text* (but not ** which is already handled)
-            text = Regex.Replace(text, @"(?<!\*)\*([^*]+)\*(?!\*)", m => "\\i " + m.Groups[1].Value + "\\i0 ");
-
-            return text;
         }
 
         private static string RtfEscape(string s)
