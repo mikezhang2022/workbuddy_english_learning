@@ -12,6 +12,11 @@ namespace CursorDesk.Core
 
         public string Result { get; set; }
 
+        /// <summary>
+        /// Execution mode: "cloud" (Cursor Agent API) or "local" (local CLI agent).
+        /// </summary>
+        public string Mode { get; set; }
+
         public DateTime CreatedAt { get; set; }
     }
 }

@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -19,6 +20,7 @@ namespace CursorDesk.App
         private CancellationTokenSource _cts;
         private string _accountLabel = string.Empty;
         private bool _busy;
+        private bool _loadingSettings;
         private string _currentAgentId = string.Empty;
         private string _currentAgentUrl = string.Empty;
         private string _currentBranch = string.Empty;
@@ -27,6 +29,19 @@ namespace CursorDesk.App
         private const string SettingRepoUrl = "repoUrl";
         private const string SettingBranch = "currentBranch";
         private const string DefaultRepoUrl = "https://github.com/mikezhang2022/workbuddy_english_learning";
+
+        private const string SettingExecMode = "execMode";
+        private const string SettingLocalCliPath = "localCliPath";
+        private const string SettingLocalCliArgs = "localCliArgs";
+        private const string SettingLocalCliDir = "localCliDir";
+        private const string ModeCloud = "cloud";
+        private const string ModeLocal = "local";
+        private const string DefaultCliPath = "cursor-agent";
+        private const string DefaultCliArgs = "-p --force --trust {prompt}";
+        private const string DefaultCliArgsAsk = "-p --mode ask --trust {prompt}";
+        private const string DefaultCliArgsPlan = "-p --mode plan --trust {prompt}";
+        private const string CliDirPlaceholder = "(app folder)";
+        private const string SettingLocalCapability = "localCapability";
 
         public MainForm()
         {
@@ -63,20 +78,23 @@ namespace CursorDesk.App
 
             string key;
             string error;
-            if (!KeyStore.TryRead(out key, out error))
+            if (KeyStore.TryRead(out key, out error))
             {
-                _btnSend.Enabled = false;
-                _btnValidate.Enabled = false;
+                _api = new CursorApiClient(key);
+                await LoadModelsAsync().ConfigureAwait(true);
+            }
+            else
+            {
                 SetStatus("error", error);
                 MessageBox.Show(error, "CursorDesk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
             }
 
-            _api = new CursorApiClient(key);
-            await LoadModelsAsync().ConfigureAwait(true);
-
             LoadRepoUrl();
-            _ = PreWarmAgentAsync();
+            LoadLocalSettings();
+            if (_api != null && IsCloudMode())
+            {
+                _ = PreWarmAgentAsync();
+            }
         }
 
         private void LoadRepoUrl()
@@ -108,6 +126,256 @@ namespace CursorDesk.App
             {
                 // Non-fatal.
             }
+        }
+
+        private void LoadLocalSettings()
+        {
+            EnsureStore();
+            _loadingSettings = true;
+            try
+            {
+                var mode = _store.GetSetting(SettingExecMode);
+                var requestedLocal = string.Equals(mode, ModeLocal, StringComparison.Ordinal);
+
+                var cap = _store.GetSetting(SettingLocalCapability);
+                int capIdx;
+                if (!int.TryParse(cap, out capIdx) || capIdx < 0 || capIdx > 2)
+                {
+                    capIdx = 0;
+                }
+                _cmbCapability.SelectedIndex = capIdx;
+
+                var path = _store.GetSetting(SettingLocalCliPath);
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    _txtCliPath.Text = path.Trim();
+                }
+
+                var args = _store.GetSetting(SettingLocalCliArgs);
+                if (!string.IsNullOrWhiteSpace(args))
+                {
+                    _txtCliArgs.Text = args.Trim();
+                }
+
+                var dir = _store.GetSetting(SettingLocalCliDir);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    _txtCliDir.Text = dir.Trim();
+                    _txtCliDir.ForeColor = Color.Black;
+                }
+
+                // If the saved mode is Local but the CLI doesn't actually exist on this machine,
+                // fall back to Cloud so the app is usable out of the box.
+                if (requestedLocal && !IsLocalCliAvailable())
+                {
+                    requestedLocal = false;
+                }
+
+                _cmbMode.SelectedIndex = requestedLocal ? 1 : 0;
+            }
+            catch (Exception)
+            {
+                // Non-fatal; defaults are fine.
+            }
+            finally
+            {
+                _loadingSettings = false;
+            }
+
+            UpdateLocalModeUi();
+        }
+
+        private void SaveLocalSettings()
+        {
+            EnsureStore();
+            try
+            {
+                _store.SetSetting(SettingExecMode, IsLocalMode() ? ModeLocal : ModeCloud);
+                _store.SetSetting(SettingLocalCliPath, CliPathValue());
+                _store.SetSetting(SettingLocalCliArgs, CliArgsValue());
+                _store.SetSetting(SettingLocalCliDir, CliDirValue());
+                _store.SetSetting(SettingLocalCapability, _cmbCapability.SelectedIndex.ToString());
+            }
+            catch (Exception)
+            {
+                // Non-fatal.
+            }
+        }
+
+        private string CliPathValue()
+        {
+            var v = (_txtCliPath.Text ?? string.Empty).Trim();
+            return string.IsNullOrWhiteSpace(v) ? DefaultCliPath : v;
+        }
+
+        private string CliArgsValue()
+        {
+            var v = (_txtCliArgs.Text ?? string.Empty).Trim();
+            return string.IsNullOrWhiteSpace(v) ? DefaultCliArgs : v;
+        }
+
+        private string CliDirValue()
+        {
+            var v = (_txtCliDir.Text ?? string.Empty).Trim();
+            return string.Equals(v, CliDirPlaceholder, StringComparison.Ordinal) ? string.Empty : v;
+        }
+
+        private bool IsLocalMode()
+        {
+            return _cmbMode != null && _cmbMode.SelectedIndex == 1;
+        }
+
+        private bool IsCloudMode()
+        {
+            return !IsLocalMode();
+        }
+
+        private void CmbMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            UpdateLocalModeUi();
+            if (!_loadingSettings)
+            {
+                SaveLocalSettings();
+            }
+        }
+
+        private void CmbCapability_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_loadingSettings)
+            {
+                return;
+            }
+
+            var idx = _cmbCapability.SelectedIndex;
+            if (idx == 1)
+            {
+                _txtCliArgs.Text = DefaultCliArgsAsk;
+            }
+            else if (idx == 2)
+            {
+                _txtCliArgs.Text = DefaultCliArgsPlan;
+            }
+            else
+            {
+                _txtCliArgs.Text = DefaultCliArgs;
+            }
+
+            SaveLocalSettings();
+        }
+
+        /// <summary>
+        /// Checks whether the currently configured local CLI can actually be found on disk
+        /// or on PATH. Returns false if the CLI is missing so the caller can fall back
+        /// to Cloud mode instead of crashing at send time.
+        /// </summary>
+        private bool IsLocalCliAvailable()
+        {
+            try
+            {
+                var raw = (_txtCliPath.Text ?? string.Empty).Trim();
+                var resolved = ResolveLocalCliPath(raw);
+
+                // If it looks like a bare name (no path separators), check PATH too.
+                var hasSeparator = resolved.IndexOf('\\') >= 0 || resolved.IndexOf('/') >= 0 || Path.IsPathRooted(resolved);
+                if (hasSeparator)
+                {
+                    return File.Exists(resolved);
+                }
+
+                // Bare name: try to find it via WHERE / which equivalent.
+                try
+                {
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "where",
+                        Arguments = resolved,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    using (var proc = System.Diagnostics.Process.Start(psi))
+                    {
+                        if (proc != null)
+                        {
+                            var output = proc.StandardOutput.ReadToEnd();
+                            proc.WaitForExit(5000);
+                            return proc.ExitCode == 0 && !string.IsNullOrWhiteSpace(output);
+                        }
+                    }
+                }
+                catch
+                {
+                    // "where" not available (unlikely on Windows); try direct File.Exists
+                    // on a few likely paths.
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the Cursor CLI path. If the user typed a bare command name
+        /// (e.g. "cursor-agent"), prefer the Windows install location under
+        /// %LOCALAPPDATA%\cursor-agent\ before falling back to PATH.
+        /// </summary>
+        private static string ResolveLocalCliPath(string raw)
+        {
+            var v = (raw ?? string.Empty).Trim();
+            if (v.Length == 0)
+            {
+                v = DefaultCliPath;
+            }
+
+            var hasSeparator = v.IndexOf('\\') >= 0 || v.IndexOf('/') >= 0 || Path.IsPathRooted(v);
+            if (hasSeparator)
+            {
+                return v;
+            }
+
+            var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var candidates = new[]
+            {
+                Path.Combine(local, "cursor-agent", "cursor-agent.exe"),
+                Path.Combine(local, "cursor-agent", "cursor-agent.cmd"),
+                Path.Combine(local, "cursor-agent", "cursor-agent.ps1"),
+                Path.Combine(local, "Programs", "cursor", "resources", "app", "bin", "cursor.cmd")
+            };
+
+            foreach (var c in candidates)
+            {
+                if (File.Exists(c))
+                {
+                    return c;
+                }
+            }
+
+            return v;
+        }
+
+        private void UpdateLocalModeUi()
+        {
+            var local = IsLocalMode();
+            _grpLocal.Visible = local;
+            _root.RowStyles[LocalRowIndex].Height = local ? LocalRowHeight : 0;
+            RefreshControls();
+        }
+
+        private void RefreshControls()
+        {
+            _btnSend.Enabled = !_busy && (_api != null || IsLocalMode());
+            _btnValidate.Enabled = !_busy && _api != null;
+            _cmbModel.Enabled = !_busy;
+            _cmbMode.Enabled = !_busy;
+            _cmbCapability.Enabled = !_busy && IsLocalMode();
+            _txtCliPath.Enabled = !_busy && IsLocalMode();
+            _txtCliArgs.Enabled = !_busy && IsLocalMode();
+            _txtCliDir.Enabled = !_busy && IsLocalMode();
+            _txtPrompt.ReadOnly = _busy;
         }
 
         private void LoadLocalHistory()
@@ -244,9 +512,9 @@ namespace CursorDesk.App
                 return;
             }
 
-            if (_api == null)
+            if (_api == null && !IsLocalMode())
             {
-                SetStatus("error", "API key not loaded. Add key.txt next to the executable.");
+                SetStatus("error", "API key not loaded. Add key.txt next to the executable, or switch to Local mode.");
                 return;
             }
 
@@ -266,9 +534,15 @@ namespace CursorDesk.App
 
             try
             {
-                SetBusy(true, "Sending…");
+                SetBusy(true, IsLocalMode() ? "Running locally…" : "Sending…");
                 _txtAnswer.Text = string.Empty;
                 EnsureStore();
+
+                if (IsLocalMode())
+                {
+                    await SendLocalAsync(prompt).ConfigureAwait(true);
+                    return;
+                }
 
                 // Resolve the GitHub repo (if any) so generated files land there under source/.
                 var repoUrl = (_txtRepo.Text ?? string.Empty).Trim();
@@ -373,7 +647,7 @@ namespace CursorDesk.App
             }
         }
 
-        private void SaveSession(string modelId, string prompt, string result)
+        private void SaveSession(string modelId, string prompt, string result, string mode = ModeCloud)
         {
             try
             {
@@ -387,6 +661,7 @@ namespace CursorDesk.App
                     Model = modelId,
                     Prompt = prompt,
                     Result = result ?? string.Empty,
+                    Mode = mode ?? ModeCloud,
                     CreatedAt = DateTime.UtcNow
                 };
                 _store.Insert(session);
@@ -396,6 +671,76 @@ namespace CursorDesk.App
             {
                 SetStatus("error", "Saved answer, but history write failed: " + ex.Message);
             }
+        }
+
+        private async Task SendLocalAsync(string prompt)
+        {
+            // Pre-flight: verify the CLI exists before spinning up a process.
+            var cliCheckPath = ResolveLocalCliPath(_txtCliPath.Text);
+            var hasSeparator = cliCheckPath.IndexOf('\\') >= 0 || cliCheckPath.IndexOf('/') >= 0 || Path.IsPathRooted(cliCheckPath);
+            if (hasSeparator && !File.Exists(cliCheckPath))
+            {
+                throw new InvalidOperationException(
+                    "Local CLI not found:\n  " + cliCheckPath + "\n\n" +
+                    "Fix one of:\n" +
+                    "  1. Install the Cursor CLI (cursor-agent)\n" +
+                    "  2. Change Mode to 'Cloud (Cursor API)'\n" +
+                    "  3. Set CLI path to an existing executable");
+            }
+
+            var workingDir = CliDirValue();
+            if (string.IsNullOrWhiteSpace(workingDir))
+            {
+                workingDir = AppDomain.CurrentDomain.BaseDirectory;
+            }
+
+            if (!Directory.Exists(workingDir))
+            {
+                throw new InvalidOperationException("Local working directory does not exist:\n" + workingDir);
+            }
+
+            var cliPath = ResolveLocalCliPath(_txtCliPath.Text);
+            var cliArgs = CliArgsValue();
+            if (cliPath.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase))
+            {
+                // Windows Cursor CLI ships a PowerShell wrapper; run it via powershell.exe.
+                cliArgs = "-NoProfile -ExecutionPolicy Bypass -File " + TextHelper.EncodeArgument(cliPath) + " " + cliArgs;
+                cliPath = "powershell.exe";
+            }
+            else if (cliPath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase) ||
+                     cliPath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
+            {
+                // Batch shim; run it via cmd.exe /c call.
+                cliArgs = "/c call " + TextHelper.EncodeArgument(cliPath) + " " + cliArgs;
+                cliPath = "cmd.exe";
+            }
+
+            SetStatus("working", "Running locally: " + cliPath + "  ·  dir: " + workingDir);
+
+            var executor = new LocalExecutor();
+            var sb = new StringBuilder();
+            var answer = await executor.RunAsync(
+                prompt,
+                cliPath,
+                cliArgs,
+                workingDir,
+                token =>
+                {
+                    sb.Append(token);
+                    SetAnswerText(sb.ToString());
+                },
+                _cts.Token).ConfigureAwait(true);
+
+            if (string.IsNullOrWhiteSpace(answer) && sb.Length > 0)
+            {
+                answer = sb.ToString();
+            }
+
+            try { _txtAnswer.Rtf = FormatAnswer(answer); }
+            catch { _txtAnswer.Text = answer; }
+
+            SaveSession(string.Empty, prompt, answer, ModeLocal);
+            SetStatus("done", "Finished (local).");
         }
 
         private void SetAnswerText(string text)
@@ -833,7 +1178,10 @@ namespace CursorDesk.App
                         ? s.CreatedAt.ToLocalTime()
                         : s.CreatedAt;
                     var item = new ListViewItem(local.ToString("yyyy-MM-dd HH:mm"));
-                    item.SubItems.Add(s.Model ?? string.Empty);
+                    var modeText = string.Equals(s.Mode, ModeLocal, StringComparison.Ordinal) ? "local" : "cloud";
+                    var modelText = string.IsNullOrEmpty(s.Model) ? "—" : s.Model;
+                    item.SubItems.Add(modeText);
+                    item.SubItems.Add(modelText);
                     item.SubItems.Add(TextHelper.TruncateOneLine(s.Prompt, 80));
                     item.Tag = s;
                     _lvSessions.Items.Add(item);
@@ -858,6 +1206,8 @@ namespace CursorDesk.App
                 return;
             }
 
+            _cmbMode.SelectedIndex = string.Equals(session.Mode, ModeLocal, StringComparison.Ordinal) ? 1 : 0;
+            UpdateLocalModeUi();
             _txtPrompt.Text = session.Prompt ?? string.Empty;
             var resultText = session.Result ?? string.Empty;
             try { _txtAnswer.Rtf = FormatAnswer(resultText); }
@@ -875,10 +1225,7 @@ namespace CursorDesk.App
         private void SetBusy(bool busy, string workingMessage)
         {
             _busy = busy;
-            _btnSend.Enabled = !busy && _api != null;
-            _btnValidate.Enabled = !busy && _api != null;
-            _cmbModel.Enabled = !busy;
-            _txtPrompt.ReadOnly = busy;
+            RefreshControls();
             if (busy)
             {
                 SetStatus("working", workingMessage);

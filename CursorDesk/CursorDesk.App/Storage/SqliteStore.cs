@@ -73,12 +73,13 @@ namespace CursorDesk.Storage
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
-                    "INSERT INTO Sessions (Model, Prompt, Result, CreatedAt) " +
-                    "VALUES (@model, @prompt, @result, @createdAt); " +
+                    "INSERT INTO Sessions (Model, Prompt, Result, Mode, CreatedAt) " +
+                    "VALUES (@model, @prompt, @result, @mode, @createdAt); " +
                     "SELECT last_insert_rowid();";
                 Add(cmd, "@model", session.Model ?? string.Empty);
                 Add(cmd, "@prompt", session.Prompt ?? string.Empty);
                 Add(cmd, "@result", session.Result ?? string.Empty);
+                Add(cmd, "@mode", session.Mode ?? string.Empty);
                 Add(cmd, "@createdAt", session.CreatedAt.ToUniversalTime().ToString("o"));
                 var id = Convert.ToInt64(cmd.ExecuteScalar());
                 session.Id = id;
@@ -93,7 +94,7 @@ namespace CursorDesk.Storage
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText =
-                    "SELECT Id, Model, Prompt, Result, CreatedAt " +
+                    "SELECT Id, Model, Prompt, Result, Mode, CreatedAt " +
                     "FROM Sessions ORDER BY Id DESC";
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -110,21 +111,57 @@ namespace CursorDesk.Storage
         private void EnsureSchema()
         {
             using (var conn = Open())
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText =
+                        "CREATE TABLE IF NOT EXISTS Sessions (" +
+                        "Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "Model TEXT, " +
+                        "Prompt TEXT, " +
+                        "Result TEXT, " +
+                        "Mode TEXT, " +
+                        "CreatedAt TEXT" +
+                        ");" +
+                        "CREATE TABLE IF NOT EXISTS Settings (" +
+                        "Key TEXT PRIMARY KEY, " +
+                        "Value TEXT" +
+                        ");";
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Migrate older databases that were created without the Mode column.
+                EnsureColumn(conn, "Sessions", "Mode");
+            }
+        }
+
+        private static void EnsureColumn(SQLiteConnection conn, string table, string column)
+        {
+            var exists = false;
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText =
-                    "CREATE TABLE IF NOT EXISTS Sessions (" +
-                    "Id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "Model TEXT, " +
-                    "Prompt TEXT, " +
-                    "Result TEXT, " +
-                    "CreatedAt TEXT" +
-                    ");" +
-                    "CREATE TABLE IF NOT EXISTS Settings (" +
-                    "Key TEXT PRIMARY KEY, " +
-                    "Value TEXT" +
-                    ");";
-                cmd.ExecuteNonQuery();
+                cmd.CommandText = "PRAGMA table_info(" + table + ")";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var name = reader["name"] == DBNull.Value ? null : Convert.ToString(reader["name"]);
+                        if (string.Equals(name, column, StringComparison.OrdinalIgnoreCase))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!exists)
+            {
+                using (var alter = conn.CreateCommand())
+                {
+                    alter.CommandText = "ALTER TABLE " + table + " ADD COLUMN " + column + " TEXT";
+                    alter.ExecuteNonQuery();
+                }
             }
         }
 
@@ -150,6 +187,7 @@ namespace CursorDesk.Storage
                 Model = row["Model"] == DBNull.Value ? string.Empty : Convert.ToString(row["Model"]),
                 Prompt = row["Prompt"] == DBNull.Value ? string.Empty : Convert.ToString(row["Prompt"]),
                 Result = row["Result"] == DBNull.Value ? string.Empty : Convert.ToString(row["Result"]),
+                Mode = row["Mode"] == DBNull.Value ? string.Empty : Convert.ToString(row["Mode"]),
                 CreatedAt = createdAt
             };
         }
