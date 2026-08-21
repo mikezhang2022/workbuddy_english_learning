@@ -18,7 +18,14 @@ namespace CursorDesk.App
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+
+            if (!LicenseGate.TryGetKey(out var realKey, out var licenseError, promptIfMissing: true))
+            {
+                MessageBox.Show(licenseError, "CursorDesk - 授权失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            Application.Run(new MainForm(realKey));
         }
 
         private static void OnUiThreadException(object sender, ThreadExceptionEventArgs e)

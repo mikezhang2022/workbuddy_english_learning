@@ -23,6 +23,7 @@ namespace CursorDesk.App
         private string _currentAgentId = string.Empty;
         private string _currentAgentUrl = string.Empty;
         private string _currentBranch = string.Empty;
+        private string _licensedKey = string.Empty;
         private const string SettingAgentId = "currentAgentId";
         private const string SettingAgentUrl = "currentAgentUrl";
         private const string SettingRepoUrl = "repoUrl";
@@ -32,10 +33,11 @@ namespace CursorDesk.App
         private const string ModeCloud = "cloud";
         private const string ModeLocal = "local";
 
-        public MainForm()
+        public MainForm(string apiKey)
         {
             InitializeComponent();
             _cts = new CancellationTokenSource();
+            _licensedKey = apiKey ?? string.Empty;
         }
 
         private void DisposeRuntime()
@@ -67,13 +69,15 @@ namespace CursorDesk.App
 
             string key;
             string error;
-            if (KeyStore.TryRead(out key, out error))
+            if (!string.IsNullOrWhiteSpace(_licensedKey))
             {
+                key = _licensedKey;
                 _api = new CursorApiClient(key);
                 await LoadModelsAsync().ConfigureAwait(true);
             }
             else
             {
+                error = "授权 Key 无效，程序无法启动。";
                 SetStatus("error", error);
                 MessageBox.Show(error, "CursorDesk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }

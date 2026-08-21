@@ -18,6 +18,12 @@ desktop.ini
 **/key.txt
 CursorDesk/**/bin/
 CursorDesk/**/obj/
+
+# KeyGen (build output)
+KeyGen/**/bin/
+KeyGen/**/obj/
+
+# 通用 IDE / 用户 / 数据库
 **/*.user
 .vs/
 *.db
