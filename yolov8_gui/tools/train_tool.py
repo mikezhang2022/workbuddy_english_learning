@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -64,6 +65,7 @@ class TrainTool:
         self.mode = tk.StringVar(value="auto")
         self.param_vars: dict = {}
         self.rationale: dict = {}
+        self._gpu_poll_after: Optional[str] = None
 
         setup_matplotlib()
         self.win = tk.Toplevel()
@@ -73,7 +75,17 @@ class TrainTool:
 
         self._build_ui()
         self._load_defaults()
-        self.win.protocol("WM_DELETE_WINDOW", self.win.destroy)
+        if self.ctx.device_info.cuda_available:
+            self._poll_gpu()
+        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self) -> None:
+        if self._gpu_poll_after is not None:
+            try:
+                self.win.after_cancel(self._gpu_poll_after)
+            except Exception:
+                pass
+        self.win.destroy()
 
     def _build_ui(self) -> None:
         top = ttk.Frame(self.win, padding=8)
@@ -116,6 +128,14 @@ class TrainTool:
         right = ttk.Frame(paned)
         paned.add(right, weight=2)
 
+        # 右侧顶部：训练进度
+        progress_frame = ttk.Frame(right)
+        progress_frame.pack(fill=tk.X, pady=(0, 4))
+        self.progress_label = ttk.Label(
+            progress_frame, text="当前轮数：— / —", font=f(16, "bold")
+        )
+        self.progress_label.pack(anchor=tk.W)
+
         advice_frame = ttk.LabelFrame(right, text="训练建议", padding=8)
         advice_frame.pack(fill=tk.X)
         self.advice_list = tk.Listbox(
@@ -129,7 +149,7 @@ class TrainTool:
         log_frame = ttk.LabelFrame(right, text="训练日志", padding=4)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=4)
         self.log_text = tk.Text(
-            log_frame, height=10, bg=BG_CARD, fg=FG, wrap=tk.WORD,
+            log_frame, height=16, bg=BG_CARD, fg=FG, wrap=tk.WORD,
             insertbackground=FG, highlightbackground=BORDER, relief=tk.FLAT,
         )
         self.log_text.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
@@ -154,9 +174,12 @@ class TrainTool:
         device_txt = f"设备：{self.ctx.device_info.device_arg()}"
         if self.ctx.device_info.cuda_available:
             device_txt += f"（{self.ctx.device_info.gpu_name}）"
+        elif self.ctx.device_info.gpu_via_smi:
+            device_txt += "（CPU — PyTorch 未启用 CUDA，需重装 GPU 版 torch）"
         else:
             device_txt += "（CPU — 无 CUDA）"
-        ttk.Label(self.win, text=device_txt, style="Dim.TLabel").pack(fill=tk.X, padx=8)
+        self.device_label = ttk.Label(self.win, text=device_txt, style="Dim.TLabel")
+        self.device_label.pack(fill=tk.X, padx=8)
 
     def _browse_dataset(self) -> None:
         p = filedialog.askopenfilename(filetypes=[("YAML", "*.yaml *.yml"), ("全部", "*.*")])
@@ -245,20 +268,90 @@ class TrainTool:
 
         safe_ui(self.win, ui)
 
+    def _on_progress(self, epoch: int, total_epochs: int, metrics_line: str) -> None:
+        def ui():
+            self.progress_label.config(text=f"当前轮数：{epoch} / {total_epochs}")
+            if metrics_line:
+                self.result_label.config(text=metrics_line)
+
+        safe_ui(self.win, ui)
+
     def _update_chart(self, history: TrainHistory) -> None:
+        """每来数据立即重绘；显示 loss / mAP50 / val loss 三条曲线。"""
+
         def ui():
             self.ax.clear()
             if history.epoch:
-                self.ax.plot(history.epoch, history.train_loss, label="训练损失", color=ACCENT)
+                if history.train_loss:
+                    self.ax.plot(
+                        history.epoch[: len(history.train_loss)],
+                        history.train_loss,
+                        label="训练损失",
+                        color=ACCENT,
+                    )
                 if history.val_loss:
-                    self.ax.plot(history.epoch[: len(history.val_loss)], history.val_loss, label="验证损失", color=ERROR)
+                    self.ax.plot(
+                        history.epoch[: len(history.val_loss)],
+                        history.val_loss,
+                        label="验证损失",
+                        color=ERROR,
+                    )
                 if history.map50:
-                    self.ax.plot(history.epoch[: len(history.map50)], history.map50, label="mAP50", color=ACCENT2)
+                    self.ax.plot(
+                        history.epoch[: len(history.map50)],
+                        history.map50,
+                        label="mAP50",
+                        color=ACCENT2,
+                    )
             self.ax.legend(loc="upper right", fontsize=8)
             self.ax.set_xlabel("轮数")
-            self.canvas.draw()
+            self.ax.grid(True, alpha=0.3)
+            self.canvas.draw_idle()
 
         safe_ui(self.win, ui)
+
+    def _poll_gpu(self) -> None:
+        """后台每 3 秒查询 nvidia-smi 利用率，显示在设备标签后。"""
+        if not self.ctx.device_info.cuda_available:
+            return
+
+        def work() -> None:
+            util = None
+            try:
+                r = subprocess.run(
+                    [
+                        "nvidia-smi",
+                        "--query-gpu=utilization.gpu",
+                        "--format=csv,noheader,nounits",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                if r.returncode == 0 and (r.stdout or "").strip():
+                    util = (r.stdout or "").strip().splitlines()[0].strip()
+            except Exception:
+                util = None
+
+            if util is not None:
+                info = self.ctx.device_info
+                base = f"设备：{info.device_arg()}"
+                if info.gpu_name:
+                    base += f"（{info.gpu_name}）"
+                text = f"{base}  |  GPU 利用率：{util}%"
+
+                def ui():
+                    self.device_label.config(text=text)
+
+                safe_ui(self.win, ui)
+
+            def schedule():
+                self._gpu_poll_after = self.win.after(3000, self._poll_gpu)
+
+            safe_ui(self.win, schedule)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _start(self) -> None:
         ds = self.dataset_var.get()
@@ -269,20 +362,37 @@ class TrainTool:
             messagebox.showwarning("训练", "训练已在进行中")
             return
 
+        info = self.ctx.device_info
+        if (not info.cuda_available) and info.gpu_via_smi:
+            messagebox.showwarning(
+                "GPU 未启用",
+                "PyTorch 未启用 CUDA，将使用 CPU 训练；建议重装 torch+cu121。\n\n"
+                "pip uninstall torch torchvision torchaudio\n"
+                "pip install torch torchvision torchaudio "
+                "--index-url https://download.pytorch.org/whl/cu121",
+                parent=self.win,
+            )
+
         params = self._get_params()
         project = str(self.ctx.subdir("runs"))
         name = "train"
+        total = int(params.get("epochs", 0) or 0)
+
+        self.log_text.delete("1.0", tk.END)
+        self.log_text.see(tk.END)
+        self.progress_label.config(text=f"当前轮数：0 / {total}")
+        self.result_label.config(text="")
 
         self.runner = TrainRunner(
             params=params,
             dataset_yaml=ds,
             project=project,
             name=name,
-            device=self.ctx.device_info.device_arg(),
+            device=info.device_arg(),
             on_log=self._append_log,
             on_history=self._update_chart,
+            on_progress=self._on_progress,
         )
-        self.log_text.delete("1.0", tk.END)
         self._append_log("开始训练…\n")
         self.runner.start()
         self._poll_runner()
@@ -299,6 +409,9 @@ class TrainTool:
                     self.ctx.last_weights = r.best_weights
                 if r.history.epoch:
                     self._update_chart(r.history)
+                    self.progress_label.config(
+                        text=f"当前轮数：{r.history.epoch[-1]} / {r.history.epoch[-1]}"
+                    )
             else:
                 self.result_label.config(text=r.message)
 

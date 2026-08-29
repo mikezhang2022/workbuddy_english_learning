@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-DEFAULT_FONT_SIZE = 12
-DEFAULT_UI_SCALE = 1.0
+DEFAULT_FONT_SIZE = 16
+DEFAULT_UI_SCALE = 1.2
 
 # 程序目录下的配置文件（与包同级旁：yolov8_gui/yolov8_gui_config.json）
 _PACKAGE_DIR = Path(__file__).resolve().parent.parent
@@ -54,8 +54,8 @@ def load_config(workspace: Optional[Path | str] = None) -> Dict[str, Any]:
         except Exception:
             continue
 
-    cfg["font_size"] = max(8, min(24, int(cfg["font_size"])))
-    cfg["ui_scale"] = max(0.8, min(1.5, round(float(cfg["ui_scale"]) * 20) / 20))
+    cfg["font_size"] = max(8, min(32, int(cfg["font_size"])))
+    cfg["ui_scale"] = max(0.8, min(2.0, round(float(cfg["ui_scale"]) * 20) / 20))
     return cfg
 
 
@@ -66,8 +66,8 @@ def save_config(
 ) -> Path:
     """同时写入程序目录配置；若提供工作区则也写入 workspace/config.json。"""
     data = {
-        "font_size": max(8, min(24, int(font_size))),
-        "ui_scale": max(0.8, min(1.5, float(ui_scale))),
+        "font_size": max(8, min(32, int(font_size))),
+        "ui_scale": max(0.8, min(2.0, float(ui_scale))),
     }
     pkg_path = _PACKAGE_DIR / CONFIG_FILENAME
     with open(pkg_path, "w", encoding="utf-8") as f:

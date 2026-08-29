@@ -38,8 +38,8 @@ class SettingsDialog:
         self.win.title("设置")
         self.win.transient(master)
         apply_theme(self.win)
-        center_window(self.win, 480, 360)
-        self.win.minsize(400, 300)
+        center_window(self.win, 520, 420)
+        self.win.minsize(440, 360)
 
         self.font_var = tk.IntVar(value=get_font_size())
         self.scale_var = tk.DoubleVar(value=round(get_ui_scale() * 20) / 20)
@@ -68,17 +68,18 @@ class SettingsDialog:
         self.font_frame = font_frame
         row1 = ttk.Frame(font_frame)
         row1.pack(fill=tk.X)
-        ttk.Label(row1, text="小").pack(side=tk.LEFT)
+        ttk.Label(row1, text="8").pack(side=tk.LEFT)
+        # 先创建数值 Label，再创建 Scale 并 set，避免 command 回调时 AttributeError
         self.font_value_lbl = ttk.Label(font_frame, text=f"{self.font_var.get()} pt")
         self.font_scale = ttk.Scale(
             row1,
-            from_=10,
-            to=20,
+            from_=8,
+            to=32,
             orient=tk.HORIZONTAL,
             command=self._on_font_slide,
         )
         self.font_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=8)
-        ttk.Label(row1, text="大").pack(side=tk.LEFT)
+        ttk.Label(row1, text="32").pack(side=tk.LEFT)
         self.font_value_lbl.pack(anchor=tk.E, pady=(4, 0))
         self.font_scale.set(self.font_var.get())
 
@@ -92,35 +93,63 @@ class SettingsDialog:
         self.ui_scale = ttk.Scale(
             row2,
             from_=0.8,
-            to=1.5,
+            to=2.0,
             orient=tk.HORIZONTAL,
             command=self._on_scale_slide,
         )
         self.ui_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=8)
-        ttk.Label(row2, text="1.5").pack(side=tk.LEFT)
+        ttk.Label(row2, text="2.0").pack(side=tk.LEFT)
         self.scale_value_lbl.pack(anchor=tk.E, pady=(4, 0))
         self.ui_scale.set(self.scale_var.get())
 
-        self.preview_label = tk.Label(
+        preview_box = tk.Frame(
             body,
-            text="预览文字：YOLOv8 可视化工作台 — 导入 · 训练 · 对比",
             bg=BG_CARD,
-            fg=FG,
-            font=(_FONT_FAMILY, self.font_var.get(), "normal"),
             highlightbackground=BORDER,
             highlightthickness=1,
             padx=12,
-            pady=16,
-            wraplength=400,
+            pady=12,
+        )
+        preview_box.pack(fill=tk.X, pady=12)
+
+        fs = self.font_var.get()
+        self.preview_title = tk.Label(
+            preview_box,
+            text="标题示例：YOLOv8 可视化工作台",
+            bg=BG_CARD,
+            fg=FG,
+            font=(_FONT_FAMILY, max(18, int(round(fs * 22 / 16))), "bold"),
+            anchor=tk.W,
             justify=tk.LEFT,
         )
-        self.preview_label.pack(fill=tk.X, pady=12)
+        self.preview_title.pack(fill=tk.X, pady=(0, 6))
+        self.preview_label = tk.Label(
+            preview_box,
+            text="正文示例：导入 · 训练 · 对比 — 拖动滑块可实时预览字号与排版。",
+            bg=BG_CARD,
+            fg=FG,
+            font=(_FONT_FAMILY, fs, "normal"),
+            wraplength=440,
+            justify=tk.LEFT,
+            anchor=tk.W,
+        )
+        self.preview_label.pack(fill=tk.X, pady=(0, 8))
+        self.preview_btn = tk.Label(
+            preview_box,
+            text="  按钮示例  ",
+            bg="#2563eb",
+            fg="#ffffff",
+            font=(_FONT_FAMILY, fs, "bold"),
+            padx=10,
+            pady=6,
+        )
+        self.preview_btn.pack(anchor=tk.W)
 
         self.hint_label = ttk.Label(
             body,
-            text="默认字体 12、缩放 1.0。保存后主窗口立即刷新；已打开的工具窗口请关闭后重新打开。",
+            text="默认字体 16、缩放 1.2。保存后主窗口立即刷新；已打开的工具窗口请关闭后重新打开。",
             style="Dim.TLabel",
-            wraplength=420,
+            wraplength=460,
         )
         self.hint_label.pack(anchor=tk.W, pady=(0, 8))
 
@@ -165,10 +194,14 @@ class SettingsDialog:
         sc = self._snap_scale()
         base = (_FONT_FAMILY, fs, "normal")
         bold = (_FONT_FAMILY, fs, "bold")
-        title = (_FONT_FAMILY, max(14, int(round(fs * 18 / 12))), "bold")
-        dim = (_FONT_FAMILY, max(9, fs - 1), "normal")
+        title = (_FONT_FAMILY, max(18, int(round(fs * 22 / 16))), "bold")
+        dim = (_FONT_FAMILY, max(10, fs - 2), "normal")
 
         self.preview_label.configure(font=base)
+        if getattr(self, "preview_title", None) is not None:
+            self.preview_title.configure(font=title)
+        if getattr(self, "preview_btn", None) is not None:
+            self.preview_btn.configure(font=bold)
         if getattr(self, "font_value_lbl", None) is not None:
             self.font_value_lbl.configure(font=base)
         if getattr(self, "scale_value_lbl", None) is not None:
@@ -178,7 +211,7 @@ class SettingsDialog:
         self.hint_label.configure(font=dim)
 
         style = ttk.Style(self.win)
-        pad = max(4, int(round(8 * sc)))
+        pad = max(4, int(round(8 * sc * 1.2)))
         style.configure("TLabel", font=base)
         style.configure("Dim.TLabel", font=dim)
         style.configure("Title.TLabel", font=title)

@@ -8,6 +8,14 @@ import threading
 from dataclasses import dataclass, asdict
 from typing import Callable, Optional, Tuple
 
+# NVIDIA 有卡但 PyTorch 无 CUDA 时的固定提示文案
+CUDA_MISMATCH_HINT = (
+    "检测到 NVIDIA 显卡，但当前 PyTorch 未启用 CUDA。"
+    "请执行：pip uninstall torch torchvision torchaudio && "
+    "pip install torch torchvision torchaudio --index-url "
+    "https://download.pytorch.org/whl/cu121"
+)
+
 
 @dataclass
 class DeviceInfo:
@@ -26,8 +34,16 @@ class DeviceInfo:
     cudnn_version: Optional[str] = None
 
     def device_arg(self) -> int | str:
-        """Return ultralytics device argument."""
-        return 0 if self.cuda_available else "cpu"
+        """Return ultralytics device argument. Only 0 when torch.cuda is usable."""
+        if self.cuda_available:
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    return 0
+            except Exception:
+                pass
+        return "cpu"
 
     def summary_lines(self) -> list[str]:
         lines = [
@@ -50,7 +66,7 @@ class DeviceInfo:
             if self.gpu_mem_total_gb is not None:
                 free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
                 lines.append(f"显存（nvidia-smi）：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
-            lines.append("CUDA（PyTorch）：暂不可用，详见提示")
+            lines.append("CUDA（PyTorch）：暂不可用，详见下方提示")
         else:
             if self.gpu_name:
                 lines.append(f"GPU：{self.gpu_name}")
@@ -62,7 +78,8 @@ class DeviceInfo:
             lines.append(f"内存：{self.ram_total_gb:.1f} GB")
         lines.append(f"Ultralytics：{self.ultralytics_version}")
         if self.error:
-            lines.append(f"提示：{self.error}")
+            # 独立醒目行（调用方可按前缀着色）
+            lines.append(f"⚠ ERROR：{self.error}")
         return lines
 
 
@@ -112,7 +129,10 @@ def _probe_nvidia_smi() -> Tuple[Optional[str], Optional[float], Optional[float]
 
 
 def probe() -> DeviceInfo:
-    """Synchronously probe runtime environment."""
+    """Synchronously probe runtime environment.
+
+    顺序：先 nvidia-smi，再检查 torch.cuda.is_available()。
+    """
     python_version = platform.python_version()
     cpu_count = os_cpu_count()
     ram_total_gb = _ram_total_gb()
@@ -127,11 +147,20 @@ def probe() -> DeviceInfo:
     error: Optional[str] = None
     gpu_via_smi = False
 
+    # 1) 先查 nvidia-smi
+    smi_name, smi_total, smi_free = _probe_nvidia_smi()
+    if smi_name:
+        gpu_name = smi_name
+        gpu_mem_total_gb = smi_total
+        gpu_mem_free_gb = smi_free
+        gpu_via_smi = True
+
+    # 2) 再查 PyTorch / CUDA
     try:
         import torch
 
         torch_version = torch.__version__
-        cuda_available = torch.cuda.is_available()
+        cuda_available = bool(torch.cuda.is_available())
         try:
             if torch.backends.cudnn.is_available():
                 cudnn_version = str(torch.backends.cudnn.version())
@@ -145,35 +174,20 @@ def probe() -> DeviceInfo:
                 gpu_mem_total_gb = props.total_memory / (1024**3)
                 free, _total = torch.cuda.mem_get_info(0)
                 gpu_mem_free_gb = free / (1024**3)
+                gpu_via_smi = False  # torch 已提供更准确信息
             except Exception as exc:
                 error = f"GPU 检测不完整：{exc}"
+        elif gpu_via_smi:
+            # 有 NVIDIA 卡但 PyTorch 无 CUDA
+            error = CUDA_MISMATCH_HINT
+        else:
+            error = "未检测到 NVIDIA GPU（torch.cuda 不可用，且 nvidia-smi 未返回 GPU 信息）。"
     except Exception as exc:
         error = f"PyTorch 不可用：{exc}"
-
-    if not cuda_available:
-        smi_name, smi_total, smi_free = _probe_nvidia_smi()
-        if smi_name:
-            gpu_name = smi_name
-            gpu_mem_total_gb = smi_total
-            gpu_mem_free_gb = smi_free
-            gpu_via_smi = True
-            smi_hint = (
-                f"检测到 NVIDIA GPU（{gpu_name}），但 PyTorch 当前无法使用 CUDA。"
-                "常见原因：PyTorch 与本地 NVIDIA 驱动/CUDA 版本不匹配；未安装对应 cuDNN；"
-                "多显卡（笔记本集显/独显）导致 torch 默认未选中独显。"
-                "建议重新安装匹配版本，例如："
-                "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121"
-            )
-            if error:
-                error = f"{error}；{smi_hint}"
-            else:
-                error = smi_hint
-        else:
-            no_gpu = "未检测到 NVIDIA GPU（torch.cuda 不可用，且 nvidia-smi 未返回 GPU 信息）。"
-            if error:
-                error = f"{error}；{no_gpu}"
-            else:
-                error = no_gpu
+        if gpu_via_smi:
+            error = f"{error}；{CUDA_MISMATCH_HINT}"
+        elif not smi_name:
+            error = f"{error}；未检测到 NVIDIA GPU。"
 
     try:
         import ultralytics

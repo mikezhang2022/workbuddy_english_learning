@@ -33,6 +33,7 @@ from ..core.theme import (
     f,
     get_font_size,
     get_ui_scale,
+    scaled,
 )
 from ..core.tk_safe import safe_ui
 from ..core.yolo_engine import (
@@ -59,11 +60,43 @@ AUG_LABELS = {
 }
 
 
-def _cv2_to_tk(img: np.ndarray, max_size: tuple = (640, 480)) -> ImageTk.PhotoImage:
+def _cv2_to_tk(
+    img: np.ndarray,
+    max_size: tuple | None = None,
+    container: tk.Misc | None = None,
+) -> ImageTk.PhotoImage:
+    """按容器尺寸（优先宽度）自适应缩放，保持比例。"""
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     pil = Image.fromarray(rgb)
-    pil.thumbnail(max_size, Image.Resampling.LANCZOS)
-    return ImageTk.PhotoImage(pil)
+    if container is not None and max_size is None:
+        try:
+            container.update_idletasks()
+            cw = int(container.winfo_width())
+            ch = int(container.winfo_height())
+            if cw < 80:
+                cw = 640
+            if ch < 80:
+                ch = 480
+            cw = max(cw - 8, 120)
+            ch = max(ch - 8, 120)
+            iw, ih = pil.size
+            if iw > 0 and ih > 0:
+                scale = cw / float(iw)
+                nw = max(1, int(iw * scale))
+                nh = max(1, int(ih * scale))
+                if nh > ch:
+                    scale = ch / float(ih)
+                    nw = max(1, int(iw * scale))
+                    nh = max(1, int(ih * scale))
+                out = pil.resize((nw, nh), Image.Resampling.LANCZOS)
+                return ImageTk.PhotoImage(out)
+        except Exception:
+            max_size = (640, 480)
+    if max_size is None:
+        max_size = (640, 480)
+    out = pil.copy()
+    out.thumbnail(max_size, Image.Resampling.LANCZOS)
+    return ImageTk.PhotoImage(out)
 
 
 class ImageTool:
@@ -77,6 +110,7 @@ class ImageTool:
         self.model_path = model_path
         self.items: List[MediaItem] = []
         self._photos: list = []
+        self._preview_bgr: Optional[np.ndarray] = None
         self.dataset_dir = ctx.subdir("dataset")
         self.images_dir = self.dataset_dir / "images"
         self.labels_dir = self.dataset_dir / "labels"
@@ -98,7 +132,7 @@ class ImageTool:
         top = ttk.Frame(self.win, padding=8)
         top.pack(fill=tk.X)
 
-        ttk.Label(top, text="模型 (.pt)：", font=f(10)).pack(side=tk.LEFT)
+        ttk.Label(top, text="模型 (.pt)：", font=f(16)).pack(side=tk.LEFT)
         self.model_var = tk.StringVar(value=self.model_path or "")
         ttk.Entry(top, textvariable=self.model_var, width=40).pack(side=tk.LEFT, padx=4)
         ttk.Button(top, text="浏览", command=self._browse_model).pack(side=tk.LEFT)
@@ -121,18 +155,25 @@ class ImageTool:
 
         left = ttk.Frame(paned)
         paned.add(left, weight=1)
-        ttk.Label(left, text="媒体列表", font=f(10, "bold")).pack(anchor=tk.W)
+        try:
+            paned.paneconfigure(left, minsize=scaled(260))
+        except Exception:
+            pass
+        ttk.Label(left, text="媒体列表", font=f(16, "bold")).pack(anchor=tk.W)
         self.listbox = tk.Listbox(
             left, bg=BG_CARD, fg=FG, selectbackground=SELECT, selectforeground=FG,
             highlightbackground=BORDER, relief=tk.FLAT, height=20,
+            font=f(16),
         )
         self.listbox.pack(fill=tk.BOTH, expand=True)
         self.listbox.bind("<<ListboxSelect>>", self._on_select)
 
         center = ttk.Frame(paned)
         paned.add(center, weight=2)
-        self.preview_label = ttk.Label(center, text="请选择媒体以预览")
+        self.preview_frame = center
+        self.preview_label = ttk.Label(center, text="请选择媒体以预览（双击可放大）")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
+        self.preview_label.bind("<Double-Button-1>", self._on_preview_double_click)
 
         right = ttk.Notebook(paned)
         paned.add(right, weight=1)
@@ -255,17 +296,39 @@ class ImageTool:
             if img is not None:
                 if item.dets:
                     img = draw_dets(img, item.dets)
-                photo = _cv2_to_tk(img)
-                self._photos = [photo]
-                self.preview_label.config(image=photo, text="")
+                self._show_preview(img)
         else:
             cap = cv2.VideoCapture(item.path)
             ret, frame = cap.read()
             cap.release()
             if ret:
-                photo = _cv2_to_tk(frame)
-                self._photos = [photo]
-                self.preview_label.config(image=photo, text="")
+                self._show_preview(frame)
+
+    def _show_preview(self, img: np.ndarray) -> None:
+        self._preview_bgr = img.copy()
+        photo = _cv2_to_tk(img, container=self.preview_frame)
+        self._photos = [photo]
+        self.preview_label.config(image=photo, text="")
+
+    def _on_preview_double_click(self, _evt=None) -> None:
+        if self._preview_bgr is None:
+            return
+        self._open_enlarged_preview(self._preview_bgr)
+
+    def _open_enlarged_preview(self, img: np.ndarray) -> None:
+        top = tk.Toplevel(self.win)
+        top.title("图片预览（双击关闭）")
+        configure_theme(top, font_size=get_font_size(), ui_scale=get_ui_scale())
+        photo = _cv2_to_tk(img, max_size=(1200, 800))
+        lbl = ttk.Label(top, image=photo)
+        lbl.image = photo  # type: ignore[attr-defined]
+        lbl.pack(fill=tk.BOTH, expand=True)
+        lbl.bind("<Double-Button-1>", lambda _e: top.destroy())
+        top.bind("<Double-Button-1>", lambda _e: top.destroy())
+        try:
+            center_window(top, min(1200, photo.width() + 40), min(800, photo.height() + 60))
+        except Exception:
+            pass
 
     def _auto_annotate(self) -> None:
         def work():
@@ -383,9 +446,8 @@ class ImageTool:
         cfg = self._get_aug_config()
         samples = preview(img, cfg, n=4)
         if samples:
-            photo = _cv2_to_tk(samples[0])
-            self._photos = [photo]
-            self.preview_label.config(image=photo, text="数据增强预览（1/4）")
+            self._show_preview(samples[0])
+            self.preview_label.config(text="数据增强预览（1/4）")
 
     def _run_aug(self) -> None:
         cfg = self._get_aug_config()

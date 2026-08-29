@@ -1,6 +1,6 @@
 # YOLOv8 可视化工作台
 
-面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.3**）。
+面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.4**）。
 
 更完整的操作说明见 [USER_MANUAL.md](USER_MANUAL.md)。
 
@@ -8,8 +8,8 @@
 
 主窗口右上角「⚙ 设置」，或菜单 **工具 → 设置**：
 
-- **界面字体大小**：滑块 10–20，默认 12；拖动时可在设置窗口内实时预览
-- **界面缩放 (DPI)**：0.8–1.5（步进 0.05），默认 1.0，放大按钮、间距与窗口尺寸
+- **界面字体大小**：滑块 8–32，默认 16；拖动时可在设置窗口内实时预览
+- **界面缩放 (DPI)**：0.8–2.0（步进 0.05），默认 1.2，放大按钮、间距与窗口尺寸
 
 配置写入程序目录 `yolov8_gui_config.json`，并同步到工作区 `config.json`；下次启动自动加载。保存后主窗口立即刷新；已打开的工具窗口请关闭后重新打开。
 
@@ -22,6 +22,8 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
+
+若字体仍然偏小，请在主界面右上角「⚙ 设置」中继续调大字体与缩放。
 
 直接打开指定工具：
 
@@ -201,15 +203,15 @@ from yolov8_gui.core.device import probe
 import tempfile
 from pathlib import Path
 
-assert __version__ == "1.0.3", __version__
+assert __version__ == "1.0.4", __version__
 
 # configure_theme 改变全局字号（无需真正弹出窗口时用 Tk 根或 mock）
 import tkinter as tk
 root = tk.Tk()
 root.withdraw()
-configure_theme(root, font_size=16, ui_scale=1.0)
-assert get_font_size() == 16, get_font_size()
-configure_theme(root, font_size=12, ui_scale=1.0)  # 恢复默认便于后续 GUI
+configure_theme(root, font_size=20, ui_scale=1.0)
+assert get_font_size() == 20, get_font_size()
+configure_theme(root, font_size=16, ui_scale=1.2)  # 恢复默认便于后续 GUI
 root.destroy()
 
 with tempfile.TemporaryDirectory() as td:
@@ -225,8 +227,8 @@ PY
 
 **通过标准**：
 
-- `__version__ == "1.0.3"`
-- `configure_theme(..., font_size=16)` 后 `get_font_size() == 16`
+- `__version__ == "1.0.4"`
+- `configure_theme(..., font_size=20)` 后 `get_font_size() == 20`
 - `save_config` → `load_config` 往返一致（字号 / 缩放）
 - `probe()` **不抛异常**
 
@@ -245,18 +247,18 @@ python main.py
 
 **检查项**：
 
-1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.3`**。
+1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.4`**。
 2. **浅色主题**（浅灰/白底、深色文字），非深色模式。
 3. 主界面有 **三张工具卡片**：「图片/视频工具」「模型训练工具」「模型对比工具」，各有「打开」。
 4. 底部 **「环境 / 硬件」** 文本框显示 **Python**、**CPU**、**CUDA**（是/否）等；**无 GPU 时有中文提示且进程不崩溃**。
 5. 点击右上角 **「⚙ 设置」**（或菜单 **工具 → 设置**）弹出标题为 **「设置」** 的窗口。
 6. 在设置窗中：
-   - 拖动 **界面字体大小**（约 **10–20**）：设置窗内文字**实时预览**变大/变小。
-   - 拖动 **界面缩放 (DPI)**（约 **0.8–1.5**）：按钮/间距/窗口尺寸可预览变化。
+   - 拖动 **界面字体大小**（约 **8–32**）：设置窗内文字**实时预览**变大/变小。
+   - 拖动 **界面缩放 (DPI)**（约 **0.8–2.0**）：按钮/间距/窗口尺寸可预览变化。
 7. 点 **「保存并应用」**：主窗口立即按新配置刷新；配置写入 `yolov8_gui/yolov8_gui_config.json` 与工作区 `config.json`。
 8. **关闭并重新启动** `main.py`：字号与缩放与保存值一致（持久化）。
 
-可选：点「恢复默认」后字号回 12、缩放回 1.0。
+可选：点「恢复默认」后字号回 16、缩放回 1.2。
 
 ---
 
@@ -320,8 +322,8 @@ python main.py
 执行者在全部完成后勾选：
 
 - [ ] `python -m compileall yolov8_gui` 成功，且 `python yolov8_gui/tests/smoke_test.py` 报告 **Ran 8 tests … OK**
-- [ ] 启动健康检查脚本通过（`__version__=="1.0.3"`、主题字号、配置往返、`probe()`）
-- [ ] GUI 启动：标题含 v1.0.3、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
+- [ ] 启动健康检查脚本通过（`__version__=="1.0.4"`、主题字号、配置往返、`probe()`）
+- [ ] GUI 启动：标题含 v1.0.4、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
 - [ ] 工具 1：模型选择、导入、自动标注、质检、一键优化、增强预览/运行、导出 train/val+yaml、发送到训练、导出标注视频（按可用素材尽量覆盖）
 - [ ] 工具 2：浏览数据集、自动/手动、建议与一键修复、少 epoch 冒烟训练、停止、联动回图片工具、`best.pt` 可找到
 - [ ] 工具 3：模型 A/B、选图/视频、运行对比、差异图与分析报告、导出 HTML/文本/PNG
@@ -340,6 +342,13 @@ python main.py
 - 默认 `yolov8n.pt` 为 COCO 类别；自定义业务类别需先自训再标注/对比。
 
 ### 更新日志
+
+#### v1.0.4
+
+- 默认字体 16pt、UI 缩放 1.2；设置范围放宽至字体 8–32、缩放 0.8–2.0。
+- 图片/视频预览按容器宽度自适应，双击可放大查看。
+- 训练日志实时滚动，按 epoch 刷新曲线与「当前轮数：X / Y」。
+- CUDA 可用时强制 `device=0`；有显卡但 PyTorch 为 CPU 版时给出明确重装提示。
 
 #### v1.0.3
 

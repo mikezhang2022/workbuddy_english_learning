@@ -23,9 +23,9 @@ FONT_FAMILY = "Segoe UI"
 # 设计稿基准字号（相对尺寸换算用）
 _DESIGN_BASE = 12
 
-# 当前可配置主题状态
-_FONT_SIZE: int = 12
-_UI_SCALE: float = 1.0
+# 当前可配置主题状态（默认显著放大）
+_FONT_SIZE: int = 16
+_UI_SCALE: float = 1.2
 
 COLORS = {
     "bg": BG,
@@ -99,45 +99,55 @@ def apply_theme(root: tk.Tk | tk.Toplevel) -> ttk.Style:
     except Exception:
         pass
 
-    pad = scaled(8)
-    tab_pad_x = scaled(14)
-    tab_pad_y = scaled(8)
-    row_h = scaled(30)
+    # 在 scaled() 基础上再放大 1.2，默认 ui_scale=1.2 时更宽松
+    pad = max(1, int(round(scaled(8) * 1.2)))
+    tab_pad_x = max(1, int(round(scaled(14) * 1.2)))
+    tab_pad_y = max(1, int(round(scaled(8) * 1.2)))
+    row_h = max(1, int(round(scaled(max(30, _FONT_SIZE + 10)) * 1.2)))
 
-    style.configure(".", background=BG, foreground=FG, fieldbackground=BG_INPUT, bordercolor=BORDER, font=f(12))
+    style.configure(".", background=BG, foreground=FG, fieldbackground=BG_INPUT, bordercolor=BORDER, font=f(16))
     style.configure("TFrame", background=BG)
     style.configure("Card.TFrame", background=BG_CARD, relief="flat")
-    style.configure("TLabel", background=BG, foreground=FG, font=f(12))
-    style.configure("Dim.TLabel", background=BG, foreground=FG_DIM, font=f(11))
-    style.configure("Title.TLabel", background=BG, foreground=FG, font=f(18, "bold"))
-    style.configure("CardTitle.TLabel", background=BG_CARD, foreground=FG, font=f(14, "bold"))
-    style.configure("Card.TLabel", background=BG_CARD, foreground=FG_DIM, font=f(11))
-    style.configure("TButton", background=BG_INPUT, foreground=FG, font=f(12), padding=pad)
+    style.configure("TLabel", background=BG, foreground=FG, font=f(16))
+    style.configure("Dim.TLabel", background=BG, foreground=FG_DIM, font=f(14))
+    style.configure("Title.TLabel", background=BG, foreground=FG, font=f(22, "bold"))
+    style.configure("CardTitle.TLabel", background=BG_CARD, foreground=FG, font=f(18, "bold"))
+    style.configure("Card.TLabel", background=BG_CARD, foreground=FG_DIM, font=f(14))
+    style.configure("TButton", background=BG_INPUT, foreground=FG, font=f(16), padding=pad)
     style.map("TButton", background=[("active", SELECT), ("pressed", BORDER)])
-    style.configure("Accent.TButton", background=ACCENT, foreground="#ffffff", font=f(12, "bold"), padding=pad)
+    style.configure("Accent.TButton", background=ACCENT, foreground="#ffffff", font=f(16, "bold"), padding=pad)
     style.map("Accent.TButton", background=[("active", "#1d4ed8")])
-    style.configure("TEntry", fieldbackground=BG_INPUT, foreground=FG, insertcolor=FG, font=f(12))
+    style.configure("TEntry", fieldbackground=BG_INPUT, foreground=FG, insertcolor=FG, font=f(16))
     style.map("TEntry", fieldbackground=[("readonly", BG_INPUT)], foreground=[("readonly", FG)])
-    style.configure("TCombobox", fieldbackground=BG_INPUT, foreground=FG, selectbackground=SELECT, font=f(12))
+    style.configure("TCombobox", fieldbackground=BG_INPUT, foreground=FG, selectbackground=SELECT, font=f(16))
     style.map(
         "TCombobox",
         fieldbackground=[("readonly", BG_INPUT)],
         foreground=[("readonly", FG)],
         selectbackground=[("readonly", SELECT)],
     )
-    style.configure("TSpinbox", fieldbackground=BG_INPUT, foreground=FG, insertcolor=FG, font=f(12))
-    style.configure("TCheckbutton", background=BG, foreground=FG, font=f(12))
+    style.configure("TSpinbox", fieldbackground=BG_INPUT, foreground=FG, insertcolor=FG, font=f(16))
+    style.configure("TCheckbutton", background=BG, foreground=FG, font=f(16))
     style.map("TCheckbutton", background=[("active", BG)])
-    style.configure("Card.TCheckbutton", background=BG_CARD, foreground=FG, font=f(12))
-    style.configure("TRadiobutton", background=BG, foreground=FG, font=f(12))
+    style.configure("Card.TCheckbutton", background=BG_CARD, foreground=FG, font=f(16))
+    style.configure("TRadiobutton", background=BG, foreground=FG, font=f(16))
     style.map("TRadiobutton", background=[("active", BG)])
-    style.configure("TNotebook", background=BG, tabmargins=[scaled(2), scaled(5), scaled(2), 0])
+    style.configure(
+        "TNotebook",
+        background=BG,
+        tabmargins=[
+            max(1, int(round(scaled(2) * 1.2))),
+            max(1, int(round(scaled(5) * 1.2))),
+            max(1, int(round(scaled(2) * 1.2))),
+            0,
+        ],
+    )
     style.configure(
         "TNotebook.Tab",
         background=BG_CARD,
         foreground=FG_DIM,
         padding=[tab_pad_x, tab_pad_y],
-        font=f(12),
+        font=f(16),
     )
     style.map(
         "TNotebook.Tab",
@@ -152,27 +162,27 @@ def apply_theme(root: tk.Tk | tk.Toplevel) -> ttk.Style:
         foreground=FG,
         fieldbackground=BG_INPUT,
         rowheight=row_h,
-        font=f(12),
+        font=f(16),
     )
     style.map("Treeview", background=[("selected", SELECT)], foreground=[("selected", FG)])
-    style.configure("Treeview.Heading", background=BG_CARD, foreground=FG, font=f(12, "bold"))
+    style.configure("Treeview.Heading", background=BG_CARD, foreground=FG, font=f(16, "bold"))
     style.configure("TLabelframe", background=BG, foreground=FG)
-    style.configure("TLabelframe.Label", background=BG, foreground=ACCENT, font=f(12, "bold"))
+    style.configure("TLabelframe.Label", background=BG, foreground=ACCENT, font=f(16, "bold"))
     style.configure("Card.TLabelframe", background=BG_CARD, foreground=FG)
-    style.configure("Card.TLabelframe.Label", background=BG_CARD, foreground=ACCENT, font=f(12, "bold"))
+    style.configure("Card.TLabelframe.Label", background=BG_CARD, foreground=ACCENT, font=f(16, "bold"))
     style.configure("TScale", background=BG)
     return style
 
 
 def configure_theme(
     root: tk.Tk | tk.Toplevel | None = None,
-    font_size: int = 12,
-    ui_scale: float = 1.0,
+    font_size: int = 16,
+    ui_scale: float = 1.2,
 ) -> Optional[ttk.Style]:
     """设置全局字体大小与 UI 缩放，并可选立即应用到 root。"""
     global _FONT_SIZE, _UI_SCALE
-    _FONT_SIZE = max(8, min(24, int(font_size)))
-    _UI_SCALE = max(0.8, min(1.5, float(ui_scale)))
+    _FONT_SIZE = max(8, min(32, int(font_size)))
+    _UI_SCALE = max(0.8, min(2.0, float(ui_scale)))
     if root is not None:
         enable_dpi(root, _UI_SCALE)
         return apply_theme(root)
