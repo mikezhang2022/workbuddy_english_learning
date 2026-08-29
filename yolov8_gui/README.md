@@ -1,8 +1,17 @@
 # YOLOv8 可视化工作台
 
-面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题。
+面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.2**）。
 
 更完整的操作说明见 [USER_MANUAL.md](USER_MANUAL.md)。
+
+## 设置（字体与缩放）
+
+主窗口右上角「⚙ 设置」，或菜单 **工具 → 设置**：
+
+- **界面字体大小**：滑块 10–20，默认 12；拖动时可在设置窗口内实时预览
+- **界面缩放 (DPI)**：0.8–1.5（步进 0.05），默认 1.0，放大按钮、间距与窗口尺寸
+
+配置写入程序目录 `yolov8_gui_config.json`，并同步到工作区 `config.json`；下次启动自动加载。保存后主窗口立即刷新；已打开的工具窗口请关闭后重新打开。
 
 ## 快速开始
 
@@ -93,7 +102,9 @@ yolov8_gui/
 ├── __init__.py
 ├── core/
 │   ├── device.py           # GPU/CUDA 检测
-│   ├── theme.py            # 浅色 ttk 主题
+│   ├── theme.py            # 浅色 ttk 主题（可配置字号/缩放）
+│   ├── app_config.py       # 界面配置读写
+│   ├── settings_dialog.py  # 设置窗口
 │   ├── context.py          # AppContext / 工作区
 │   ├── io_utils.py         # Unicode I/O、MediaItem
 │   ├── yolo_engine.py      # 推理、绘制检测框

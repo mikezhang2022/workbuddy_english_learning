@@ -17,7 +17,19 @@ from PIL import Image, ImageTk
 from ..core.compare import compare, export_report_html
 from ..core.context import AppContext
 from ..core.io_utils import MediaItem
-from ..core.theme import ACCENT, ACCENT2, BG_CARD, BORDER, FG, apply_theme, center_window, f, setup_matplotlib
+from ..core.theme import (
+    ACCENT,
+    ACCENT2,
+    BG_CARD,
+    BORDER,
+    FG,
+    center_window,
+    configure_theme,
+    f,
+    get_font_size,
+    get_ui_scale,
+    setup_matplotlib,
+)
 from ..core.yolo_engine import DEFAULT_MODEL
 
 
@@ -47,7 +59,7 @@ class CompareTool:
         setup_matplotlib()
         self.win = tk.Toplevel()
         self.win.title("工具 3 — 模型对比工具")
-        apply_theme(self.win)
+        configure_theme(self.win, font_size=get_font_size(), ui_scale=get_ui_scale())
         center_window(self.win, 1100, 800)
 
         self._build_ui()

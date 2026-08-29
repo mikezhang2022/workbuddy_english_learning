@@ -6,7 +6,18 @@ from .context import AppContext
 from .dataset_qc import DatasetReport, Issue, apply_fixes, check as dataset_check
 from .device import DeviceInfo, probe, probe_async
 from .io_utils import MediaItem, extract_frames, imread_unicode, imwrite_unicode, list_media
-from .theme import COLORS, apply_theme, center_window, enable_dpi, f, setup_matplotlib
+from .theme import (
+    COLORS,
+    apply_theme,
+    center_window,
+    configure_theme,
+    enable_dpi,
+    f,
+    get_font_size,
+    get_ui_scale,
+    setup_matplotlib,
+)
+from .app_config import load_config, save_config
 from .train_engine import AdviceItem, build_train_args, default_params, validate_params
 from .train_runner import TrainHistory, TrainResult, TrainRunner
 from .yolo_engine import (
@@ -47,6 +58,7 @@ __all__ = [
     "build_train_args",
     "center_window",
     "compare",
+    "configure_theme",
     "dataset_check",
     "default_params",
     "draw_dets",
@@ -55,14 +67,18 @@ __all__ = [
     "export_report_html",
     "extract_frames",
     "f",
+    "get_font_size",
+    "get_ui_scale",
     "imread_unicode",
     "imwrite_unicode",
     "list_media",
+    "load_config",
     "load_model",
     "model_display_name",
     "preview",
     "probe",
     "probe_async",
+    "save_config",
     "setup_matplotlib",
     "validate_params",
 ]

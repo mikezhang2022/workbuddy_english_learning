@@ -19,7 +19,21 @@ from ..core.augment import AugConfig, estimate_new_samples, preview, run as augm
 from ..core.context import AppContext
 from ..core.dataset_qc import apply_fixes, check as dataset_check
 from ..core.io_utils import MediaItem, extract_frames, imread_unicode, list_media
-from ..core.theme import ACCENT, BG, BG_CARD, BORDER, FG, FG_DIM, SELECT, WARN, apply_theme, center_window, f
+from ..core.theme import (
+    ACCENT,
+    BG,
+    BG_CARD,
+    BORDER,
+    FG,
+    FG_DIM,
+    SELECT,
+    WARN,
+    center_window,
+    configure_theme,
+    f,
+    get_font_size,
+    get_ui_scale,
+)
 from ..core.yolo_engine import (
     DEFAULT_MODEL,
     Predictor,
@@ -70,7 +84,7 @@ class ImageTool:
 
         self.win = tk.Toplevel()
         self.win.title("工具 1 — 图片/视频工具")
-        apply_theme(self.win)
+        configure_theme(self.win, font_size=get_font_size(), ui_scale=get_ui_scale())
         center_window(self.win, 1200, 800)
 
         device = ctx.device_info.device_arg()

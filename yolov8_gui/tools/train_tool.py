@@ -13,7 +13,22 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from ..core.context import AppContext
-from ..core.theme import ACCENT, ACCENT2, BG_CARD, BORDER, ERROR, FG, SELECT, WARN, apply_theme, center_window, f, setup_matplotlib
+from ..core.theme import (
+    ACCENT,
+    ACCENT2,
+    BG_CARD,
+    BORDER,
+    ERROR,
+    FG,
+    SELECT,
+    WARN,
+    center_window,
+    configure_theme,
+    f,
+    get_font_size,
+    get_ui_scale,
+    setup_matplotlib,
+)
 from ..core.train_engine import AdviceItem, default_params, validate_params
 from ..core.train_runner import TrainHistory, TrainRunner
 
@@ -51,7 +66,7 @@ class TrainTool:
         setup_matplotlib()
         self.win = tk.Toplevel()
         self.win.title("工具 2 — 模型训练工具")
-        apply_theme(self.win)
+        configure_theme(self.win, font_size=get_font_size(), ui_scale=get_ui_scale())
         center_window(self.win, 1100, 850)
 
         self._build_ui()
