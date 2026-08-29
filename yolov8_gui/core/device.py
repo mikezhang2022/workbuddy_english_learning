@@ -29,22 +29,22 @@ class DeviceInfo:
 
     def summary_lines(self) -> list[str]:
         lines = [
-            f"Python: {self.python_version}",
-            f"PyTorch: {self.torch_version}",
-            f"CUDA: {'Yes' if self.cuda_available else 'No'}"
-            + (f" ({self.cuda_version})" if self.cuda_version else ""),
+            f"Python：{self.python_version}",
+            f"PyTorch：{self.torch_version}",
+            f"CUDA：{'是' if self.cuda_available else '否'}"
+            + (f"（{self.cuda_version}）" if self.cuda_version else ""),
         ]
         if self.gpu_name:
-            lines.append(f"GPU: {self.gpu_name}")
+            lines.append(f"GPU：{self.gpu_name}")
         if self.gpu_mem_total_gb is not None:
             free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
-            lines.append(f"VRAM: {free:.1f} / {self.gpu_mem_total_gb:.1f} GB free")
-        lines.append(f"CPU cores: {self.cpu_count}")
+            lines.append(f"显存：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
+        lines.append(f"CPU 核心数：{self.cpu_count}")
         if self.ram_total_gb is not None:
-            lines.append(f"RAM: {self.ram_total_gb:.1f} GB")
-        lines.append(f"Ultralytics: {self.ultralytics_version}")
+            lines.append(f"内存：{self.ram_total_gb:.1f} GB")
+        lines.append(f"Ultralytics：{self.ultralytics_version}")
         if self.error:
-            lines.append(f"Note: {self.error}")
+            lines.append(f"提示：{self.error}")
         return lines
 
 
@@ -70,13 +70,13 @@ def probe() -> DeviceInfo:
     python_version = platform.python_version()
     cpu_count = os_cpu_count()
     ram_total_gb = _ram_total_gb()
-    torch_version = "not installed"
+    torch_version = "未安装"
     cuda_available = False
     cuda_version: Optional[str] = None
     gpu_name: Optional[str] = None
     gpu_mem_total_gb: Optional[float] = None
     gpu_mem_free_gb: Optional[float] = None
-    ultralytics_version = "not installed"
+    ultralytics_version = "未安装"
     error: Optional[str] = None
 
     try:
@@ -93,9 +93,9 @@ def probe() -> DeviceInfo:
                 free, _total = torch.cuda.mem_get_info(0)
                 gpu_mem_free_gb = free / (1024**3)
             except Exception as exc:
-                error = f"GPU probe partial: {exc}"
+                error = f"GPU 检测不完整：{exc}"
     except Exception as exc:
-        error = f"PyTorch unavailable: {exc}"
+        error = f"PyTorch 不可用：{exc}"
 
     try:
         import ultralytics
@@ -103,9 +103,9 @@ def probe() -> DeviceInfo:
         ultralytics_version = ultralytics.__version__
     except Exception as exc:
         if error:
-            error += f"; Ultralytics: {exc}"
+            error += f"；Ultralytics：{exc}"
         else:
-            error = f"Ultralytics unavailable: {exc}"
+            error = f"Ultralytics 不可用：{exc}"
 
     return DeviceInfo(
         python_version=python_version,

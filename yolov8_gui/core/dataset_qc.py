@@ -41,21 +41,21 @@ class DatasetReport:
 
     def summary(self) -> str:
         lines = [
-            f"Images: {self.total_images}",
-            f"Labels: {self.total_labels}",
-            f"Blurry: {self.blurry_count}",
-            f"Over-dark: {self.dark_count}",
-            f"Over-bright: {self.bright_count}",
-            f"Near-duplicates: {self.duplicate_count}",
-            f"Missing labels: {self.missing_label_count}",
-            f"Empty labels: {self.empty_label_count}",
-            f"Invalid boxes: {self.invalid_box_count}",
+            f"图片数：{self.total_images}",
+            f"标签数：{self.total_labels}",
+            f"模糊：{self.blurry_count}",
+            f"过暗：{self.dark_count}",
+            f"过亮：{self.bright_count}",
+            f"近重复：{self.duplicate_count}",
+            f"缺失标签：{self.missing_label_count}",
+            f"空标签：{self.empty_label_count}",
+            f"无效框：{self.invalid_box_count}",
         ]
         if self.class_counts:
-            lines.append("Class distribution:")
+            lines.append("类别分布：")
             for cid, cnt in sorted(self.class_counts.items()):
                 name = self.class_names.get(cid, str(cid))
-                lines.append(f"  [{cid}] {name}: {cnt}")
+                lines.append(f"  [{cid}] {name}：{cnt}")
         return "\n".join(lines)
 
 
@@ -81,19 +81,19 @@ def _parse_yolo_label(path: Path, w: int, h: int) -> Tuple[List[Tuple], List[str
     for ln, line in enumerate(text.splitlines(), 1):
         parts = line.strip().split()
         if len(parts) < 5:
-            errors.append(f"line {ln}: malformed")
+            errors.append(f"第 {ln} 行：格式错误")
             continue
         try:
             cls_id = int(parts[0])
             vals = [float(x) for x in parts[1:5]]
         except ValueError:
-            errors.append(f"line {ln}: non-numeric")
+            errors.append(f"第 {ln} 行：非数字")
             continue
         cx, cy, bw, bh = vals
         if not all(0 <= v <= 1 for v in vals):
-            errors.append(f"line {ln}: out of range [0,1]")
+            errors.append(f"第 {ln} 行：数值超出 [0,1]")
         if bw <= 0 or bh <= 0:
-            errors.append(f"line {ln}: zero size")
+            errors.append(f"第 {ln} 行：框尺寸为零")
         boxes.append((cls_id, cx, cy, bw, bh))
     return boxes, errors
 
@@ -123,7 +123,7 @@ def check(
     for img_path in image_paths:
         img = imread_unicode(img_path)
         if img is None:
-            report.issues.append(Issue("read_error", str(img_path), "Cannot read image", False))
+            report.issues.append(Issue("read_error", str(img_path), "无法读取图片", False))
             continue
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -133,18 +133,18 @@ def check(
         if lap < blur_threshold:
             report.blurry_count += 1
             report.issues.append(
-                Issue("blur", str(img_path), f"Laplacian var={lap:.1f}", True, "sharpen")
+                Issue("blur", str(img_path), f"拉普拉斯方差={lap:.1f}", True, "sharpen")
             )
 
         if mean_brightness < dark_threshold:
             report.dark_count += 1
             report.issues.append(
-                Issue("dark", str(img_path), f"mean={mean_brightness:.1f}", True, "clahe")
+                Issue("dark", str(img_path), f"均值={mean_brightness:.1f}", True, "clahe")
             )
         elif mean_brightness > bright_threshold:
             report.bright_count += 1
             report.issues.append(
-                Issue("bright", str(img_path), f"mean={mean_brightness:.1f}", True, "brightness")
+                Issue("bright", str(img_path), f"均值={mean_brightness:.1f}", True, "brightness")
             )
 
         ph = _perceptual_hash(img)
@@ -157,10 +157,10 @@ def check(
         boxes, errs = _parse_yolo_label(label_path, img.shape[1], img.shape[0])
         if "missing" in errs:
             report.missing_label_count += 1
-            report.issues.append(Issue("missing_label", str(img_path), "No label file", True, "remove_or_label"))
+            report.issues.append(Issue("missing_label", str(img_path), "无标签文件", True, "remove_or_label"))
         elif "empty" in errs:
             report.empty_label_count += 1
-            report.issues.append(Issue("empty_label", str(label_path), "Empty label", True, "remove"))
+            report.issues.append(Issue("empty_label", str(label_path), "空标签", True, "remove"))
         else:
             report.total_labels += 1
             for cls_id, *_ in boxes:
@@ -176,7 +176,7 @@ def check(
             report.duplicate_count += len(paths) - 1
             for p in paths[1:]:
                 report.issues.append(
-                    Issue("duplicate", p, f"Duplicate of {paths[0]}", True, "dedup")
+                    Issue("duplicate", p, f"与 {paths[0]} 重复", True, "dedup")
                 )
 
     report.class_counts = dict(class_counter)

@@ -1,8 +1,10 @@
-# YOLOv8 Visual Studio
+# YOLOv8 可视化工作台
 
-A production-quality Python desktop application for YOLOv8 workflows: import & annotate data, train models, and compare two models side-by-side. Built with **Tkinter (ttk)**, **Ultralytics YOLOv8**, and **PyTorch**.
+面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题。
 
-## Quick Start
+更完整的操作说明见 [USER_MANUAL.md](USER_MANUAL.md)。
+
+## 快速开始
 
 ```bash
 cd yolov8_gui
@@ -12,7 +14,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Open a specific tool directly:
+直接打开指定工具：
 
 ```bash
 python main.py --tool image
@@ -20,106 +22,105 @@ python main.py --tool train
 python main.py --tool compare
 ```
 
-Set workspace via environment variable:
+通过环境变量设置工作区：
 
 ```bash
 export YOLOV8_WORKSPACE=~/my_yolo_project
 python main.py
 ```
 
-## GPU Usage
+## GPU 使用
 
-- PyTorch CUDA is auto-detected at startup.
-- When a GPU is available, training and inference use `device=0`.
-- Without CUDA, the app falls back to CPU and shows a clear warning in the launcher — it will not crash.
+- 启动时自动检测 PyTorch CUDA。
+- 有 GPU 时，训练与推理使用 `device=0`。
+- 无 CUDA 时回退到 CPU，启动器会给出明确提示，不会崩溃。
 
-## Default Model vs Custom Model
+## 默认模型与自定义模型
 
-- If you do **not** provide a `.pt` file, the app loads **`yolov8n.pt`** (Ultralytics default, downloaded automatically).
-- The UI clearly labels this as the **default COCO pretrained model** — class names are COCO categories.
-- For your own classes, train a custom model in Tool 2 or supply your own `.pt` in Tool 1 / Tool 3.
+- 未提供 `.pt` 文件时，加载 **`yolov8n.pt`**（Ultralytics 默认，首次会自动下载）。
+- 界面会标明这是 **默认 COCO 预训练模型**，类别为 COCO 类别。
+- 自定义类别请在「模型训练工具」中训练，或在「图片/视频工具」「模型对比工具」中自行指定 `.pt`。
 
-## Features by Tool
+## 各工具功能
 
-### Tool 1 — Image / Video Processing
-- Import single image, video, or folder (mixed media)
-- Thumbnail list and preview
-- Auto-annotate with custom or default model; write YOLO `.txt` labels
-- Export annotated video
-- **Data health check**: blur, exposure, duplicates, label issues
-- **One-click optimize**: dedup, CLAHE, sharpen, label fix
-- **Augmentation** with live preview and sample count estimate
-- Export `train/val` split + `data.yaml`
-- **Send to Training Tool** one-click handoff
+### 工具 1 — 图片/视频工具
+- 导入单张图片、视频或文件夹（混合媒体）
+- 缩略列表与预览
+- 用自定义或默认模型自动标注，写出 YOLO `.txt` 标签
+- 导出标注视频
+- **数据质检**：模糊、曝光、重复、标签问题
+- **一键优化**：去重、CLAHE、锐化、标签修复
+- **数据增强**：实时预览与样本数量估算
+- 导出 `train/val` 划分 + `data.yaml`
+- **发送到模型训练工具** 一键联动
 
-### Tool 2 — Model Training
-- **AUTO mode**: optimal hyperparameters with rationale
-- **MANUAL mode**: edit epochs, lr0, batch, imgsz, optimizer, etc.
-- Live **advice panel** with one-click fixes (batch/VRAM, lr, epochs, val split, class imbalance)
-- Link back to Tool 1 for augmentation when data is insufficient
-- Background training with live log and matplotlib loss/mAP charts
-- Stop training; saves best weights to workspace
+### 工具 2 — 模型训练工具
+- **自动模式**：推荐超参及说明
+- **手动模式**：编辑轮数、学习率、批次大小、输入尺寸、优化器等
+- 实时**建议面板**，一键修复（批次/显存、学习率、轮数、验证集、类别不平衡）
+- 样本不足时可联动回图片/视频工具做数据增强
+- 后台训练，实时日志与 matplotlib 损失/mAP 曲线
+- 可停止训练；最佳权重保存到工作区
 
-### Tool 3 — Model Comparison
-- Load two `.pt` models (or default) on the same image/video
-- Side-by-side visualization + diff overlay (agreement / only-A / only-B)
-- Analysis: detection counts, class distribution, confidence, IoU, FP/FN, speed (ms/img)
-- Improvement suggestions
-- Export HTML, text, or chart PNG report
+### 工具 3 — 模型对比工具
+- 在同一图片/视频上加载两个 `.pt`（或默认）模型
+- 并排可视化 + 差异叠加（一致 / 仅 A / 仅 B）
+- 分析：检测数、类别分布、置信度、IoU、漏检误检、速度（ms/图）
+- 改进建议
+- 导出 HTML、文本或图表 PNG 报告
 
-## Shared Workspace
+## 共享工作区
 
-All tools share state via the workspace folder (`~/yolov8_workspace` by default):
+三个工具通过工作区文件夹共享状态（默认 `~/yolov8_workspace`）：
 
-| File / key            | Purpose                          |
-|-----------------------|----------------------------------|
-| `workspace_state.json`| last dataset yaml, weights, models |
-| `dataset/`            | images & labels from Tool 1      |
-| `export/data.yaml`    | training-ready dataset           |
-| `runs/train/`         | training outputs & best.pt       |
+| 文件 / 键 | 用途 |
+|-----------|------|
+| `workspace_state.json` | 最近的 dataset yaml、权重、模型路径 |
+| `dataset/` | 工具 1 的图片与标签 |
+| `export/data.yaml` | 可训练数据集 |
+| `runs/train/` | 训练输出与 best.pt |
 
-Typical flow: **Tool 1** (import → augment → export) → **Tool 2** (train) → **Tool 3** (compare old vs new weights).
+典型流程：**图片/视频工具**（导入 → 增强 → 导出）→ **模型训练工具**（训练）→ **模型对比工具**（新旧权重对比）。
 
-## Project Tree
+## 项目结构
 
 ```
 yolov8_gui/
-├── main.py                 # Launcher + CLI
+├── main.py                 # 启动器 + CLI
 ├── requirements.txt
 ├── README.md
+├── USER_MANUAL.md          # 中文操作手册
 ├── __init__.py
 ├── core/
-│   ├── __init__.py
-│   ├── device.py           # GPU/CUDA probe
-│   ├── theme.py            # Dark ttk theme
-│   ├── context.py          # AppContext / workspace
-│   ├── io_utils.py         # Unicode I/O, MediaItem
-│   ├── yolo_engine.py      # Predictor, draw_dets
-│   ├── dataset_qc.py       # Dataset health checks
-│   ├── augment.py          # Augmentation pipeline
-│   ├── train_engine.py     # Params & advice
-│   ├── train_runner.py     # Background training
-│   └── compare.py          # Model comparison engine
+│   ├── device.py           # GPU/CUDA 检测
+│   ├── theme.py            # 浅色 ttk 主题
+│   ├── context.py          # AppContext / 工作区
+│   ├── io_utils.py         # Unicode I/O、MediaItem
+│   ├── yolo_engine.py      # 推理、绘制检测框
+│   ├── dataset_qc.py       # 数据集质检
+│   ├── augment.py          # 数据增强流水线
+│   ├── train_engine.py     # 参数与建议
+│   ├── train_runner.py     # 后台训练
+│   └── compare.py          # 模型对比引擎
 ├── tools/
-│   ├── __init__.py
-│   ├── image_tool.py       # Tool 1 GUI
-│   ├── train_tool.py       # Tool 2 GUI
-│   └── compare_tool.py     # Tool 3 GUI
+│   ├── image_tool.py       # 工具 1 GUI
+│   ├── train_tool.py       # 工具 2 GUI
+│   └── compare_tool.py     # 工具 3 GUI
 └── tests/
-    └── smoke_test.py       # Headless logic tests
+    └── smoke_test.py       # 无界面冒烟测试
 ```
 
-## Tests
+## 测试
 
 ```bash
 python -m compileall yolov8_gui
 python yolov8_gui/tests/smoke_test.py
 ```
 
-Smoke tests cover imports, augment, dataset QC, compare IoU matching, train param validation, and unicode I/O. GUI and GPU-heavy paths are not required in CI.
+冒烟测试覆盖导入、增强、质检、对比 IoU 匹配、训练参数校验、Unicode I/O。GUI 与重度 GPU 路径不要求在 CI 中运行。
 
-## Requirements
+## 环境要求
 
 - Python 3.10+
-- See `requirements.txt` for Python packages
-- Optional: NVIDIA GPU + CUDA for faster training/inference
+- 依赖见 `requirements.txt`
+- 可选：NVIDIA GPU + CUDA，以加速训练/推理

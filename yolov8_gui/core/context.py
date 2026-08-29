@@ -99,7 +99,7 @@ class AppContext:
 
     def open_tool(self, key: str, **kwargs: Any) -> Any:
         if key not in self._tool_openers:
-            raise KeyError(f"Unknown tool: {key}")
+            raise KeyError(f"未知工具：{key}")
         return self._tool_openers[key](**kwargs)
 
     def refresh_device(self) -> DeviceInfo:

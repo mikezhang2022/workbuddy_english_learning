@@ -78,8 +78,8 @@ def is_default_model(model) -> bool:
 
 def model_display_name(model) -> str:
     if is_default_model(model):
-        return f"{DEFAULT_MODEL} (default COCO pretrained)"
-    return getattr(model, "_model_path", "custom model")
+        return f"{DEFAULT_MODEL}（默认 COCO 预训练）"
+    return getattr(model, "_model_path", "自定义模型")
 
 
 class Predictor:

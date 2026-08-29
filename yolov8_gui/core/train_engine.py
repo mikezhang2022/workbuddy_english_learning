@@ -95,15 +95,15 @@ def default_params(dataset: Optional[str] = None) -> tuple[dict, dict]:
     }
 
     rationale = {
-        "epochs": f"{epochs} epochs balances convergence vs overfit for ~{train_n} train images.",
-        "lr0": "0.01 is YOLOv8 default SGD peak LR; works well for fine-tuning.",
-        "batch": f"Batch {batch} fits typical GPU VRAM; increase if memory allows.",
-        "imgsz": "640 is standard YOLO input; good speed/accuracy tradeoff.",
-        "optimizer": "SGD with momentum is Ultralytics default and stable for detection.",
-        "momentum": "0.937 matches YOLOv8 defaults.",
-        "weight_decay": "0.0005 regularizes weights without underfitting small datasets.",
-        "warmup_epochs": "3-epoch warmup stabilizes early training.",
-        "patience": "Early stopping after 20 epochs without val improvement.",
+        "epochs": f"{epochs} 轮在约 {train_n} 张训练图上兼顾收敛与过拟合。",
+        "lr0": "0.01 为 YOLOv8 默认 SGD 峰值学习率，适合微调。",
+        "batch": f"批次大小 {batch} 适合常见 GPU 显存；显存充足时可增大。",
+        "imgsz": "640 为标准 YOLO 输入尺寸，速度与精度较均衡。",
+        "optimizer": "带动量的 SGD 是 Ultralytics 默认，检测任务较稳定。",
+        "momentum": "0.937 与 YOLOv8 默认一致。",
+        "weight_decay": "0.0005 正则化权重，小数据集不易欠拟合。",
+        "warmup_epochs": "3 轮预热可稳定早期训练。",
+        "patience": "验证指标 20 轮无提升则早停。",
     }
     return params, rationale
 
@@ -158,10 +158,10 @@ def validate_params(params: dict, dataset: Optional[str], device_info: DeviceInf
             advice.append(
                 AdviceItem(
                     "error",
-                    f"Batch {batch} likely too large for {vram:.1f} GB VRAM → reduce batch.",
+                    f"批次大小 {batch} 对 {vram:.1f} GB 显存可能过大 → 请减小批次。",
                     "batch",
                     new_batch,
-                    f"Set batch to {new_batch}",
+                    f"将批次大小设为 {new_batch}",
                 )
             )
     elif not device_info.cuda_available:
@@ -169,25 +169,25 @@ def validate_params(params: dict, dataset: Optional[str], device_info: DeviceInf
             advice.append(
                 AdviceItem(
                     "warn",
-                    "Training on CPU with large batch will be very slow.",
+                    "在 CPU 上使用较大批次会非常慢。",
                     "batch",
                     4,
-                    "Set batch to 4 for CPU",
+                    "CPU 模式将批次大小设为 4",
                 )
             )
 
     if lr0 > 0.05:
         advice.append(
-            AdviceItem("warn", "lr0 too high — may cause divergence.", "lr0", 0.01, "Set lr0 to 0.01")
+            AdviceItem("warn", "学习率过高 — 可能导致发散。", "lr0", 0.01, "将学习率设为 0.01")
         )
     elif lr0 < 0.0001:
         advice.append(
-            AdviceItem("warn", "lr0 very low — training may stall.", "lr0", 0.001, "Set lr0 to 0.001")
+            AdviceItem("warn", "学习率过低 — 训练可能停滞。", "lr0", 0.001, "将学习率设为 0.001")
         )
 
     if epochs < 20:
         advice.append(
-            AdviceItem("warn", "Epochs too few for reliable convergence.", "epochs", 50, "Set epochs to 50")
+            AdviceItem("warn", "轮数过少，难以可靠收敛。", "epochs", 50, "将轮数设为 50")
         )
 
     train_n, val_n, names = 0, 0, {}
@@ -202,10 +202,10 @@ def validate_params(params: dict, dataset: Optional[str], device_info: DeviceInf
             advice.append(
                 AdviceItem(
                     "error",
-                    "No validation split — metrics will be unreliable.",
+                    "没有验证集划分 — 指标将不可靠。",
                     "val_split",
                     0.2,
-                    "Create 20% val split in Tool 1",
+                    "在图片/视频工具中创建 20% 验证集",
                 )
             )
 
@@ -213,10 +213,10 @@ def validate_params(params: dict, dataset: Optional[str], device_info: DeviceInf
             advice.append(
                 AdviceItem(
                     "warn",
-                    f"Only {train_n} training images — augment data in Tool 1.",
+                    f"仅有 {train_n} 张训练图片 — 请在图片/视频工具中做数据增强。",
                     "augment",
                     True,
-                    "Send to Tool 1 for augmentation",
+                    "发送到图片/视频工具做数据增强",
                 )
             )
 
@@ -239,10 +239,10 @@ def validate_params(params: dict, dataset: Optional[str], device_info: DeviceInf
                             advice.append(
                                 AdviceItem(
                                     "warn",
-                                    "Severe class imbalance detected.",
+                                    "检测到严重的类别不平衡。",
                                     "augment",
                                     True,
-                                    "Balance classes via augmentation",
+                                    "通过数据增强平衡类别",
                                 )
                             )
             except Exception:

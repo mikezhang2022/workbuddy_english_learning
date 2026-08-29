@@ -126,13 +126,13 @@ def _build_overlay(
     for i in only_a:
         d = dets_a[i]
         x1, y1, x2, y2 = [int(v) for v in d.xyxy]
-        cv2.rectangle(diff, (x1, y1), (x2, y2), (243, 139, 168), 3)
-        cv2.putText(diff, "A only", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (243, 139, 168), 1)
+        cv2.rectangle(diff, (x1, y1), (x2, y2), (220, 38, 38), 3)
+        cv2.putText(diff, "仅A", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (220, 38, 38), 1)
     for j in only_b:
         d = dets_b[j]
         x1, y1, x2, y2 = [int(v) for v in d.xyxy]
-        cv2.rectangle(diff, (x1, y1), (x2, y2), (249, 226, 175), 3)
-        cv2.putText(diff, "B only", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (249, 226, 175), 1)
+        cv2.rectangle(diff, (x1, y1), (x2, y2), (217, 119, 6), 3)
+        cv2.putText(diff, "仅B", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (217, 119, 6), 1)
     for _i, _j, iou in pairs:
         pass  # agreement shown in side-by-side
 
@@ -141,52 +141,52 @@ def _build_overlay(
     panel[:, w + 10 : w * 2 + 10] = right
     panel[:, w * 2 + 20 :] = diff
 
-    cv2.putText(panel, "Model A", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (137, 180, 250), 2)
-    cv2.putText(panel, "Model B", (w + 20, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (166, 227, 161), 2)
-    cv2.putText(panel, "Diff", (w * 2 + 30, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (243, 139, 168), 2)
+    cv2.putText(panel, "Model A", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (37, 99, 235), 2)
+    cv2.putText(panel, "Model B", (w + 20, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (5, 150, 105), 2)
+    cv2.putText(panel, "Diff", (w * 2 + 30, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 38, 38), 2)
     return panel
 
 
 def _generate_analysis(stats: CompareStats, name_a: str, name_b: str) -> Tuple[str, List[str]]:
     lines = [
-        f"=== Comparison: {name_a} vs {name_b} ===",
-        f"Total detections — A: {stats.count_a}, B: {stats.count_b}",
-        f"Matched (agreement): {stats.agreement}",
-        f"Only A: {stats.only_a} | Only B: {stats.only_b}",
-        f"Mean IoU (matched): {stats.mean_iou:.3f}",
-        f"Inference — A: {stats.ms_a:.1f} ms/img, B: {stats.ms_b:.1f} ms/img",
-        f"Missed by A (B found): {stats.missed_by_a}",
-        f"Missed by B (A found): {stats.missed_by_b}",
+        f"=== 对比：{name_a} vs {name_b} ===",
+        f"检测总数 — A：{stats.count_a}，B：{stats.count_b}",
+        f"匹配（一致）：{stats.agreement}",
+        f"仅 A：{stats.only_a} | 仅 B：{stats.only_b}",
+        f"平均 IoU（匹配）：{stats.mean_iou:.3f}",
+        f"推理耗时 — A：{stats.ms_a:.1f} ms/图，B：{stats.ms_b:.1f} ms/图",
+        f"A 漏检（B 检出）：{stats.missed_by_a}",
+        f"B 漏检（A 检出）：{stats.missed_by_b}",
     ]
     if stats.class_counts_a or stats.class_counts_b:
-        lines.append("Class distribution A: " + str(dict(stats.class_counts_a)))
-        lines.append("Class distribution B: " + str(dict(stats.class_counts_b)))
+        lines.append("类别分布 A：" + str(dict(stats.class_counts_a)))
+        lines.append("类别分布 B：" + str(dict(stats.class_counts_b)))
     if stats.conf_a:
-        lines.append(f"Avg confidence A: {np.mean(stats.conf_a):.3f}")
+        lines.append(f"平均置信度 A：{np.mean(stats.conf_a):.3f}")
     if stats.conf_b:
-        lines.append(f"Avg confidence B: {np.mean(stats.conf_b):.3f}")
+        lines.append(f"平均置信度 B：{np.mean(stats.conf_b):.3f}")
 
     suggestions = []
     if stats.ms_a < stats.ms_b * 0.8:
-        suggestions.append(f"{name_a} is significantly faster; consider for deployment.")
+        suggestions.append(f"{name_a} 明显更快，可考虑用于部署。")
     elif stats.ms_b < stats.ms_a * 0.8:
-        suggestions.append(f"{name_b} is significantly faster; consider for deployment.")
+        suggestions.append(f"{name_b} 明显更快，可考虑用于部署。")
 
     if stats.only_a > stats.only_b * 1.5:
-        suggestions.append(f"{name_a} produces more unique detections — may have higher recall or more FP.")
+        suggestions.append(f"{name_a} 独有检测更多 — 可能召回更高，或误检更多。")
     elif stats.only_b > stats.only_a * 1.5:
-        suggestions.append(f"{name_b} produces more unique detections — review precision/recall tradeoff.")
+        suggestions.append(f"{name_b} 独有检测更多 — 请权衡精确率/召回率。")
 
     if stats.mean_iou < 0.5 and stats.agreement > 0:
-        suggestions.append("Low IoU on matches — models localize differently; review training data.")
+        suggestions.append("匹配框 IoU 偏低 — 两模型定位差异较大，请复查训练数据。")
 
     if stats.missed_by_a > stats.missed_by_b:
-        suggestions.append(f"{name_b} detects objects {name_a} misses — consider ensembling or retrain A.")
+        suggestions.append(f"{name_b} 能检出 {name_a} 漏掉的目标 — 可考虑集成或重训 A。")
     elif stats.missed_by_b > stats.missed_by_a:
-        suggestions.append(f"{name_a} detects objects {name_b} misses — consider ensembling or retrain B.")
+        suggestions.append(f"{name_a} 能检出 {name_b} 漏掉的目标 — 可考虑集成或重训 B。")
 
     if not suggestions:
-        suggestions.append("Models are broadly similar; choose based on speed vs accuracy needs.")
+        suggestions.append("两模型整体相近；可按速度与精度需求选型。")
 
     return "\n".join(lines), suggestions
 
@@ -206,8 +206,8 @@ def compare(
     pred_a.load()
     pred_b.load()
 
-    name_a = model_a_path or "default"
-    name_b = model_b_path or "default"
+    name_a = model_a_path or "默认模型"
+    name_b = model_b_path or "默认模型"
 
     frames: List[np.ndarray] = []
     if media.kind == "image":
@@ -225,7 +225,7 @@ def compare(
         cap.release()
 
     if not frames:
-        report.analysis = "Could not load media."
+        report.analysis = "无法加载媒体文件。"
         return report
 
     total_ms_a = total_ms_b = 0.0
@@ -256,15 +256,15 @@ def compare(
 
 def export_report_html(report: CompareReport, path: str, chart_path: Optional[str] = None) -> None:
     html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>YOLO Compare Report</title>
-<style>body{{font-family:sans-serif;background:#1e1e2e;color:#cdd6f4;padding:20px}}
-pre{{background:#2a2a3d;padding:12px;border-radius:8px}}ul{{line-height:1.8}}</style></head>
-<body><h1>Model Comparison Report</h1>
+<html><head><meta charset="utf-8"><title>YOLO 模型对比报告</title>
+<style>body{{font-family:sans-serif;background:#f5f7fa;color:#1f2937;padding:20px}}
+pre{{background:#ffffff;padding:12px;border-radius:8px;border:1px solid #d1d5db}}ul{{line-height:1.8}}</style></head>
+<body><h1>模型对比报告</h1>
 <pre>{report.analysis}</pre>
-<h2>Suggestions</h2><ul>{"".join(f"<li>{s}</li>" for s in report.suggestions)}</ul>
+<h2>改进建议</h2><ul>{"".join(f"<li>{s}</li>" for s in report.suggestions)}</ul>
 """
     if chart_path:
-        html += f'<h2>Chart</h2><img src="{chart_path}" style="max-width:100%"/>'
+        html += f'<h2>图表</h2><img src="{chart_path}" style="max-width:100%"/>'
     html += "</body></html>"
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)

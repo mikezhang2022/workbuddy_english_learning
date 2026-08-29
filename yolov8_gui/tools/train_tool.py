@@ -1,4 +1,4 @@
-"""Tool 2 — Model training."""
+"""工具 2 — 模型训练。"""
 
 from __future__ import annotations
 
@@ -13,13 +13,27 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from ..core.context import AppContext
-from ..core.theme import ACCENT, ERROR, WARN, apply_theme, center_window, f, setup_matplotlib
+from ..core.theme import ACCENT, ACCENT2, BG_CARD, BORDER, ERROR, FG, SELECT, WARN, apply_theme, center_window, f, setup_matplotlib
 from ..core.train_engine import AdviceItem, default_params, validate_params
 from ..core.train_runner import TrainHistory, TrainRunner
 
+# 参数键 → 中文标签
+PARAM_LABELS = {
+    "epochs": "轮数",
+    "lr0": "学习率",
+    "batch": "批次大小",
+    "imgsz": "输入尺寸",
+    "optimizer": "优化器",
+    "momentum": "动量",
+    "weight_decay": "权重衰减",
+    "warmup_epochs": "预热轮数",
+    "patience": "早停耐心值",
+    "model": "模型",
+}
+
 
 class TrainTool:
-    """YOLOv8 training with auto/manual modes and live charts."""
+    """YOLOv8 训练：自动/手动模式与实时曲线。"""
 
     PARAM_KEYS = [
         "epochs", "lr0", "batch", "imgsz", "optimizer", "momentum",
@@ -36,7 +50,7 @@ class TrainTool:
 
         setup_matplotlib()
         self.win = tk.Toplevel()
-        self.win.title("Tool 2 — Model Training")
+        self.win.title("工具 2 — 模型训练工具")
         apply_theme(self.win)
         center_window(self.win, 1100, 850)
 
@@ -48,21 +62,21 @@ class TrainTool:
         top = ttk.Frame(self.win, padding=8)
         top.pack(fill=tk.X)
 
-        ttk.Label(top, text="Dataset (data.yaml):").pack(side=tk.LEFT)
+        ttk.Label(top, text="数据集 (data.yaml)：").pack(side=tk.LEFT)
         self.dataset_var = tk.StringVar(value=self.dataset_yaml)
         ttk.Entry(top, textvariable=self.dataset_var, width=50).pack(side=tk.LEFT, padx=4)
-        ttk.Button(top, text="Browse", command=self._browse_dataset).pack(side=tk.LEFT)
-        ttk.Button(top, text="Send to Tool 1 →", command=self._send_to_image).pack(side=tk.LEFT, padx=8)
+        ttk.Button(top, text="浏览", command=self._browse_dataset).pack(side=tk.LEFT)
+        ttk.Button(top, text="发送到图片/视频工具 →", command=self._send_to_image).pack(side=tk.LEFT, padx=8)
 
         mode_frame = ttk.Frame(self.win, padding=4)
         mode_frame.pack(fill=tk.X)
-        ttk.Radiobutton(mode_frame, text="AUTO (recommended)", variable=self.mode, value="auto", command=self._on_mode).pack(side=tk.LEFT, padx=8)
-        ttk.Radiobutton(mode_frame, text="MANUAL", variable=self.mode, value="manual", command=self._on_mode).pack(side=tk.LEFT)
+        ttk.Radiobutton(mode_frame, text="自动（推荐）", variable=self.mode, value="auto", command=self._on_mode).pack(side=tk.LEFT, padx=8)
+        ttk.Radiobutton(mode_frame, text="手动", variable=self.mode, value="manual", command=self._on_mode).pack(side=tk.LEFT)
 
         paned = ttk.PanedWindow(self.win, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
-        params_frame = ttk.LabelFrame(paned, text="Parameters", padding=8)
+        params_frame = ttk.LabelFrame(paned, text="参数", padding=8)
         paned.add(params_frame, weight=1)
 
         self.params_grid = ttk.Frame(params_frame)
@@ -70,7 +84,8 @@ class TrainTool:
         for key in self.PARAM_KEYS:
             row = ttk.Frame(self.params_grid)
             row.pack(fill=tk.X, pady=2)
-            ttk.Label(row, text=key, width=14).pack(side=tk.LEFT)
+            label = PARAM_LABELS.get(key, key)
+            ttk.Label(row, text=label, width=14).pack(side=tk.LEFT)
             var = tk.StringVar()
             self.param_vars[key] = var
             entry = ttk.Entry(row, textvariable=var, width=12)
@@ -84,22 +99,28 @@ class TrainTool:
         right = ttk.Frame(paned)
         paned.add(right, weight=2)
 
-        advice_frame = ttk.LabelFrame(right, text="Training Advice", padding=8)
+        advice_frame = ttk.LabelFrame(right, text="训练建议", padding=8)
         advice_frame.pack(fill=tk.X)
-        self.advice_list = tk.Listbox(advice_frame, height=5, bg="#313244", fg="#cdd6f4")
+        self.advice_list = tk.Listbox(
+            advice_frame, height=5, bg=BG_CARD, fg=FG, selectbackground=SELECT,
+            selectforeground=FG, highlightbackground=BORDER, relief=tk.FLAT,
+        )
         self.advice_list.pack(fill=tk.X)
         self._advice_items: list = []
-        ttk.Button(advice_frame, text="Apply Selected Fix", command=self._apply_fix).pack(pady=4)
+        ttk.Button(advice_frame, text="应用所选修复", command=self._apply_fix).pack(pady=4)
 
-        log_frame = ttk.LabelFrame(right, text="Training Log", padding=4)
+        log_frame = ttk.LabelFrame(right, text="训练日志", padding=4)
         log_frame.pack(fill=tk.BOTH, expand=True, pady=4)
-        self.log_text = tk.Text(log_frame, height=10, bg="#313244", fg="#cdd6f4", wrap=tk.WORD)
+        self.log_text = tk.Text(
+            log_frame, height=10, bg=BG_CARD, fg=FG, wrap=tk.WORD,
+            insertbackground=FG, highlightbackground=BORDER, relief=tk.FLAT,
+        )
         self.log_text.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
         sb = ttk.Scrollbar(log_frame, command=self.log_text.yview)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         self.log_text.config(yscrollcommand=sb.set)
 
-        chart_frame = ttk.LabelFrame(right, text="Live Metrics", padding=4)
+        chart_frame = ttk.LabelFrame(right, text="实时指标", padding=4)
         chart_frame.pack(fill=tk.BOTH, expand=True)
         self.fig = Figure(figsize=(5, 3), dpi=100)
         self.ax = self.fig.add_subplot(111)
@@ -108,20 +129,20 @@ class TrainTool:
 
         btn_row = ttk.Frame(self.win, padding=8)
         btn_row.pack(fill=tk.X)
-        ttk.Button(btn_row, text="Start Training", command=self._start, style="Accent.TButton").pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn_row, text="Stop", command=self._stop).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn_row, text="开始训练", command=self._start, style="Accent.TButton").pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn_row, text="停止", command=self._stop).pack(side=tk.LEFT, padx=4)
         self.result_label = ttk.Label(btn_row, text="", style="Dim.TLabel")
         self.result_label.pack(side=tk.LEFT, padx=16)
 
-        device_txt = f"Device: {self.ctx.device_info.device_arg()}"
+        device_txt = f"设备：{self.ctx.device_info.device_arg()}"
         if self.ctx.device_info.cuda_available:
-            device_txt += f" ({self.ctx.device_info.gpu_name})"
+            device_txt += f"（{self.ctx.device_info.gpu_name}）"
         else:
-            device_txt += " (CPU — no CUDA)"
+            device_txt += "（CPU — 无 CUDA）"
         ttk.Label(self.win, text=device_txt, style="Dim.TLabel").pack(fill=tk.X, padx=8)
 
     def _browse_dataset(self) -> None:
-        p = filedialog.askopenfilename(filetypes=[("YAML", "*.yaml *.yml"), ("All", "*.*")])
+        p = filedialog.askopenfilename(filetypes=[("YAML", "*.yaml *.yml"), ("全部", "*.*")])
         if p:
             self.dataset_var.set(p)
             self._load_defaults()
@@ -143,6 +164,7 @@ class TrainTool:
             for key, var in self.param_vars.items():
                 for w in self.params_grid.winfo_children():
                     pass
+        self._update_rationale_text()
 
     def _get_params(self) -> dict:
         params = {}
@@ -161,7 +183,7 @@ class TrainTool:
 
     def _update_rationale_text(self) -> None:
         if self.mode.get() != "auto":
-            self.rationale_label.config(text="Manual mode — adjust parameters as needed.")
+            self.rationale_label.config(text="手动模式 — 请按需调整参数。")
             return
         lines = [f"{k}: {v}" for k, v in list(self.rationale.items())[:5]]
         self.rationale_label.config(text="\n".join(lines))
@@ -191,7 +213,7 @@ class TrainTool:
         try:
             self.ctx.open_tool("image")
         except Exception as exc:
-            messagebox.showerror("Error", str(exc))
+            messagebox.showerror("错误", str(exc))
 
     def _append_log(self, text: str) -> None:
         def ui():
@@ -204,13 +226,13 @@ class TrainTool:
         def ui():
             self.ax.clear()
             if history.epoch:
-                self.ax.plot(history.epoch, history.train_loss, label="train loss", color="#89b4fa")
+                self.ax.plot(history.epoch, history.train_loss, label="训练损失", color=ACCENT)
                 if history.val_loss:
-                    self.ax.plot(history.epoch[: len(history.val_loss)], history.val_loss, label="val loss", color="#f38ba8")
+                    self.ax.plot(history.epoch[: len(history.val_loss)], history.val_loss, label="验证损失", color=ERROR)
                 if history.map50:
-                    self.ax.plot(history.epoch[: len(history.map50)], history.map50, label="mAP50", color="#a6e3a1")
+                    self.ax.plot(history.epoch[: len(history.map50)], history.map50, label="mAP50", color=ACCENT2)
             self.ax.legend(loc="upper right", fontsize=8)
-            self.ax.set_xlabel("Epoch")
+            self.ax.set_xlabel("轮数")
             self.canvas.draw()
 
         self.win.after(0, ui)
@@ -218,10 +240,10 @@ class TrainTool:
     def _start(self) -> None:
         ds = self.dataset_var.get()
         if not ds or not os.path.isfile(ds):
-            messagebox.showerror("Training", "Select a valid data.yaml")
+            messagebox.showerror("训练", "请选择有效的 data.yaml")
             return
         if self.runner and self.runner.is_running():
-            messagebox.showwarning("Training", "Already running")
+            messagebox.showwarning("训练", "训练已在进行中")
             return
 
         params = self._get_params()
@@ -238,7 +260,7 @@ class TrainTool:
             on_history=self._update_chart,
         )
         self.log_text.delete("1.0", tk.END)
-        self._append_log("Starting training...\n")
+        self._append_log("开始训练…\n")
         self.runner.start()
         self._poll_runner()
 
@@ -248,7 +270,7 @@ class TrainTool:
         elif self.runner and self.runner.result:
             r = self.runner.result
             if r.success:
-                msg = f"Done! Best: {r.best_weights}"
+                msg = f"完成！最佳权重：{r.best_weights}"
                 self.result_label.config(text=msg)
                 if r.best_weights:
                     self.ctx.last_weights = r.best_weights

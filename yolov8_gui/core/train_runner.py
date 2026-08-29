@@ -78,7 +78,7 @@ class TrainRunner:
 
     def stop(self) -> None:
         self._stop.set()
-        self.on_log("[Runner] Stop requested...\n")
+        self.on_log("[训练器] 已请求停止…\n")
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -90,7 +90,7 @@ class TrainRunner:
 
             args = build_train_args(self.params, self.dataset_yaml, self.project, self.name, self.device)
             model_name = args.pop("model")
-            self.on_log(f"Loading model {model_name} on device {self.device}\n")
+            self.on_log(f"正在加载模型 {model_name}，设备 {self.device}\n")
             model = YOLO(model_name)
 
             capture = _LogCapture(lambda s: self.on_log(s))
@@ -99,7 +99,7 @@ class TrainRunner:
                 train_results = model.train(**args)
 
             if self._stop.is_set():
-                result.message = "Training stopped by user"
+                result.message = "训练已被用户停止"
                 self.result = result
                 return
 
@@ -133,9 +133,9 @@ class TrainRunner:
                 self._parse_csv(csv_path)
                 result.history = self.history
 
-            result.message = "Training completed successfully"
+            result.message = "训练成功完成"
         except Exception as exc:
-            result.message = f"Training failed: {exc}"
+            result.message = f"训练失败：{exc}"
             self.on_log(result.message + "\n")
         self.result = result
 
