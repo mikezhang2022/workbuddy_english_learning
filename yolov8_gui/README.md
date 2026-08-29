@@ -1,6 +1,6 @@
 # YOLOv8 可视化工作台
 
-面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.2**）。
+面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.3**）。
 
 更完整的操作说明见 [USER_MANUAL.md](USER_MANUAL.md)。
 
@@ -201,7 +201,7 @@ from yolov8_gui.core.device import probe
 import tempfile
 from pathlib import Path
 
-assert __version__ == "1.0.2", __version__
+assert __version__ == "1.0.3", __version__
 
 # configure_theme 改变全局字号（无需真正弹出窗口时用 Tk 根或 mock）
 import tkinter as tk
@@ -225,7 +225,7 @@ PY
 
 **通过标准**：
 
-- `__version__ == "1.0.2"`
+- `__version__ == "1.0.3"`
 - `configure_theme(..., font_size=16)` 后 `get_font_size() == 16`
 - `save_config` → `load_config` 往返一致（字号 / 缩放）
 - `probe()` **不抛异常**
@@ -245,7 +245,7 @@ python main.py
 
 **检查项**：
 
-1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.2`**。
+1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.3`**。
 2. **浅色主题**（浅灰/白底、深色文字），非深色模式。
 3. 主界面有 **三张工具卡片**：「图片/视频工具」「模型训练工具」「模型对比工具」，各有「打开」。
 4. 底部 **「环境 / 硬件」** 文本框显示 **Python**、**CPU**、**CUDA**（是/否）等；**无 GPU 时有中文提示且进程不崩溃**。
@@ -320,8 +320,8 @@ python main.py
 执行者在全部完成后勾选：
 
 - [ ] `python -m compileall yolov8_gui` 成功，且 `python yolov8_gui/tests/smoke_test.py` 报告 **Ran 8 tests … OK**
-- [ ] 启动健康检查脚本通过（`__version__=="1.0.2"`、主题字号、配置往返、`probe()`）
-- [ ] GUI 启动：标题含 v1.0.2、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
+- [ ] 启动健康检查脚本通过（`__version__=="1.0.3"`、主题字号、配置往返、`probe()`）
+- [ ] GUI 启动：标题含 v1.0.3、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
 - [ ] 工具 1：模型选择、导入、自动标注、质检、一键优化、增强预览/运行、导出 train/val+yaml、发送到训练、导出标注视频（按可用素材尽量覆盖）
 - [ ] 工具 2：浏览数据集、自动/手动、建议与一键修复、少 epoch 冒烟训练、停止、联动回图片工具、`best.pt` 可找到
 - [ ] 工具 3：模型 A/B、选图/视频、运行对比、差异图与分析报告、导出 HTML/文本/PNG
@@ -338,6 +338,19 @@ python main.py
 - 无图形显示的 Linux：务必 `export MPLBACKEND=Agg`，GUI 用 `xvfb-run -a python main.py …`。
 - 设置保存后主窗口立即刷新；**已打开的工具窗口**需关闭后重开才能完全套用新字体/缩放。
 - 默认 `yolov8n.pt` 为 COCO 类别；自定义业务类别需先自训再标注/对比。
+
+### 更新日志
+
+#### v1.0.3
+
+- **P1** 环境面板：后台探测改用「线程安全队列 + 主线程轮询」，启动后能正确刷新设备信息；失败时显示原因。
+- **P1** 导出数据集：对 COCO 等原始类别 ID 做连续索引重映射，避免训练时报 `Label class exceeds dataset class count`。
+- **P2** 设置窗口：修正滑块 `set` 早于数值标签创建导致的 AttributeError。
+- **P2** 一键去重：按感知哈希扫描全部图片，同组相同图只保留 1 张。
+- **P2** matplotlib：配置中文字体回退列表，训练/对比曲线中文不再豆腐块。
+- **P3** 视频写出 / 报告导出：检查 VideoWriter 是否打开，写文件失败明确提示，不再静默成功或崩溃。
+- **P3** 训练参数新增可调 `workers`（默认 2，范围 0–16）。
+- **P3** 统一后台线程 → UI 的 `safe_ui` / 队列投递，杜绝子线程直接操作 Tk 控件。
 
 ## 环境要求
 

@@ -190,31 +190,20 @@ def apply_fixes(
     actions: Optional[Set[str]] = None,
 ) -> int:
     """Apply one-click fixes; returns number of items fixed."""
-    labels_dir = labels_dir or images_dir
+    labels_dir = Path(labels_dir) if labels_dir else Path(images_dir)
+    images_dir = Path(images_dir)
     fixed = 0
     actions = actions or {"dedup", "clahe", "sharpen", "fix_label", "brightness"}
 
-    seen_hashes: Set[str] = set()
+    # 去重：不依赖报告里重复标记数量，直接扫描全部图片按感知哈希去重
+    if "dedup" in actions:
+        fixed += _dedup_images(report, images_dir, labels_dir)
+
     for issue in report.issues:
-        if issue.fix_action not in actions:
+        if issue.fix_action not in actions or issue.fix_action == "dedup":
             continue
         path = Path(issue.path)
-        if issue.fix_action == "dedup":
-            img = imread_unicode(path)
-            if img is None:
-                continue
-            ph = _perceptual_hash(img)
-            if ph in seen_hashes:
-                try:
-                    path.unlink(missing_ok=True)
-                    lp = path.with_suffix(".txt")
-                    lp.unlink(missing_ok=True)
-                    fixed += 1
-                except Exception:
-                    pass
-            else:
-                seen_hashes.add(ph)
-        elif issue.fix_action == "clahe" and issue.kind == "dark":
+        if issue.fix_action == "clahe" and issue.kind == "dark":
             img = imread_unicode(path)
             if img is not None:
                 lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
@@ -261,5 +250,58 @@ def apply_fixes(
                     continue
             path.write_text("\n".join(new_lines), encoding="utf-8")
             fixed += 1
+
+    return fixed
+
+
+def _label_path_for(img_path: Path, images_dir: Path, labels_dir: Path) -> Path:
+    try:
+        rel = img_path.relative_to(images_dir)
+        candidate = labels_dir / Path(rel).with_suffix(".txt")
+        if candidate.exists() or not img_path.with_suffix(".txt").exists():
+            return candidate
+    except ValueError:
+        pass
+    return img_path.with_suffix(".txt")
+
+
+def _dedup_images(report: DatasetReport, images_dir: Path, labels_dir: Path) -> int:
+    """保留每组感知哈希的第一张，删除其后所有完全相同的重复图及标签。"""
+    image_paths: List[Path] = []
+    for root, _dirs, files in os.walk(images_dir):
+        for fn in files:
+            p = Path(root) / fn
+            if p.suffix.lower() in IMAGE_EXTS:
+                image_paths.append(p)
+
+    seen: Dict[str, Path] = {}
+    deleted: Set[str] = set()
+    fixed = 0
+
+    for img_path in sorted(image_paths, key=lambda p: str(p)):
+        img = imread_unicode(img_path)
+        if img is None:
+            continue
+        ph = _perceptual_hash(img)
+        if ph in seen:
+            try:
+                lbl = _label_path_for(img_path, images_dir, labels_dir)
+                img_path.unlink(missing_ok=True)
+                lbl.unlink(missing_ok=True)
+                # 同目录旁路标签也尝试删除
+                side = img_path.with_suffix(".txt")
+                if side != lbl:
+                    side.unlink(missing_ok=True)
+                deleted.add(str(img_path))
+                fixed += 1
+            except Exception:
+                pass
+        else:
+            seen[ph] = img_path
+
+    if deleted:
+        report.issues = [i for i in report.issues if i.path not in deleted]
+        report.duplicate_count = max(0, report.duplicate_count - len(deleted))
+        report.total_images = max(0, report.total_images - len(deleted))
 
     return fixed

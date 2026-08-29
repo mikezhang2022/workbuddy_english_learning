@@ -29,6 +29,7 @@ from ..core.theme import (
     get_ui_scale,
     setup_matplotlib,
 )
+from ..core.tk_safe import safe_ui
 from ..core.train_engine import AdviceItem, default_params, validate_params
 from ..core.train_runner import TrainHistory, TrainRunner
 
@@ -43,6 +44,7 @@ PARAM_LABELS = {
     "weight_decay": "权重衰减",
     "warmup_epochs": "预热轮数",
     "patience": "早停耐心值",
+    "workers": "数据加载线程数",
     "model": "模型",
 }
 
@@ -52,7 +54,7 @@ class TrainTool:
 
     PARAM_KEYS = [
         "epochs", "lr0", "batch", "imgsz", "optimizer", "momentum",
-        "weight_decay", "warmup_epochs", "patience", "model",
+        "weight_decay", "warmup_epochs", "patience", "workers", "model",
     ]
 
     def __init__(self, ctx: AppContext, dataset_yaml: str = "") -> None:
@@ -186,7 +188,7 @@ class TrainTool:
         for k, var in self.param_vars.items():
             val = var.get()
             try:
-                if k in ("epochs", "batch", "imgsz", "patience"):
+                if k in ("epochs", "batch", "imgsz", "patience", "workers"):
                     params[k] = int(float(val))
                 elif k in ("lr0", "momentum", "weight_decay", "warmup_epochs"):
                     params[k] = float(val)
@@ -194,13 +196,19 @@ class TrainTool:
                     params[k] = val
             except ValueError:
                 params[k] = val
+        # workers 限制 0–16
+        if "workers" in params:
+            try:
+                params["workers"] = max(0, min(16, int(params["workers"])))
+            except (TypeError, ValueError):
+                params["workers"] = 2
         return params
 
     def _update_rationale_text(self) -> None:
         if self.mode.get() != "auto":
-            self.rationale_label.config(text="手动模式 — 请按需调整参数。")
+            self.rationale_label.config(text="手动模式 — 请按需调整参数（含 workers 0–16）。")
             return
-        lines = [f"{k}: {v}" for k, v in list(self.rationale.items())[:5]]
+        lines = [f"{k}: {v}" for k, v in list(self.rationale.items())[:6]]
         self.rationale_label.config(text="\n".join(lines))
 
     def _refresh_advice(self) -> None:
@@ -235,7 +243,7 @@ class TrainTool:
             self.log_text.insert(tk.END, text)
             self.log_text.see(tk.END)
 
-        self.win.after(0, ui)
+        safe_ui(self.win, ui)
 
     def _update_chart(self, history: TrainHistory) -> None:
         def ui():
@@ -250,7 +258,7 @@ class TrainTool:
             self.ax.set_xlabel("轮数")
             self.canvas.draw()
 
-        self.win.after(0, ui)
+        safe_ui(self.win, ui)
 
     def _start(self) -> None:
         ds = self.dataset_var.get()

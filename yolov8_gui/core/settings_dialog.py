@@ -69,6 +69,7 @@ class SettingsDialog:
         row1 = ttk.Frame(font_frame)
         row1.pack(fill=tk.X)
         ttk.Label(row1, text="小").pack(side=tk.LEFT)
+        self.font_value_lbl = ttk.Label(font_frame, text=f"{self.font_var.get()} pt")
         self.font_scale = ttk.Scale(
             row1,
             from_=10,
@@ -76,11 +77,10 @@ class SettingsDialog:
             orient=tk.HORIZONTAL,
             command=self._on_font_slide,
         )
-        self.font_scale.set(self.font_var.get())
         self.font_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=8)
         ttk.Label(row1, text="大").pack(side=tk.LEFT)
-        self.font_value_lbl = ttk.Label(font_frame, text=f"{self.font_var.get()} pt")
         self.font_value_lbl.pack(anchor=tk.E, pady=(4, 0))
+        self.font_scale.set(self.font_var.get())
 
         scale_frame = ttk.LabelFrame(body, text="界面缩放 (DPI)", padding=10)
         scale_frame.pack(fill=tk.X, pady=6)
@@ -88,6 +88,7 @@ class SettingsDialog:
         row2 = ttk.Frame(scale_frame)
         row2.pack(fill=tk.X)
         ttk.Label(row2, text="0.8").pack(side=tk.LEFT)
+        self.scale_value_lbl = ttk.Label(scale_frame, text=f"{self.scale_var.get():.2f}×")
         self.ui_scale = ttk.Scale(
             row2,
             from_=0.8,
@@ -95,11 +96,10 @@ class SettingsDialog:
             orient=tk.HORIZONTAL,
             command=self._on_scale_slide,
         )
-        self.ui_scale.set(self.scale_var.get())
         self.ui_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=8)
         ttk.Label(row2, text="1.5").pack(side=tk.LEFT)
-        self.scale_value_lbl = ttk.Label(scale_frame, text=f"{self.scale_var.get():.2f}×")
         self.scale_value_lbl.pack(anchor=tk.E, pady=(4, 0))
+        self.ui_scale.set(self.scale_var.get())
 
         self.preview_label = tk.Label(
             body,
@@ -142,17 +142,25 @@ class SettingsDialog:
     def _on_font_slide(self, _value: str | None = None) -> None:
         v = self._snap_font()
         self.font_var.set(v)
-        self.font_value_lbl.configure(text=f"{v} pt")
-        self._preview()
+        lbl = getattr(self, "font_value_lbl", None)
+        if lbl is not None:
+            lbl.configure(text=f"{v} pt")
+        if getattr(self, "preview_label", None) is not None:
+            self._preview()
 
     def _on_scale_slide(self, _value: str | None = None) -> None:
         v = self._snap_scale()
         self.scale_var.set(v)
-        self.scale_value_lbl.configure(text=f"{v:.2f}×")
-        self._preview()
+        lbl = getattr(self, "scale_value_lbl", None)
+        if lbl is not None:
+            lbl.configure(text=f"{v:.2f}×")
+        if getattr(self, "preview_label", None) is not None:
+            self._preview()
 
     def _preview(self) -> None:
         """拖动时立即改变本设置窗口的字体，便于预览。"""
+        if getattr(self, "preview_label", None) is None:
+            return
         fs = self._snap_font()
         sc = self._snap_scale()
         base = (_FONT_FAMILY, fs, "normal")
@@ -161,8 +169,10 @@ class SettingsDialog:
         dim = (_FONT_FAMILY, max(9, fs - 1), "normal")
 
         self.preview_label.configure(font=base)
-        self.font_value_lbl.configure(font=base)
-        self.scale_value_lbl.configure(font=base)
+        if getattr(self, "font_value_lbl", None) is not None:
+            self.font_value_lbl.configure(font=base)
+        if getattr(self, "scale_value_lbl", None) is not None:
+            self.scale_value_lbl.configure(font=base)
         self.title_lbl.configure(font=title)
         self.desc_lbl.configure(font=dim)
         self.hint_label.configure(font=dim)

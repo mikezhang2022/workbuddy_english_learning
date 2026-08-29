@@ -179,21 +179,28 @@ def annotate_video(
 ) -> bool:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        return False
+        raise RuntimeError(f"视频写出失败：无法打开输入视频：{video_path}")
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 25
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(out_path, fourcc, fps, (w, h))
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        dets = predictor.predict_image(frame, conf=conf)
-        annotated = draw_dets(frame, dets, predictor.names)
-        writer.write(annotated)
-    cap.release()
-    writer.release()
+    if not writer.isOpened():
+        cap.release()
+        raise RuntimeError(
+            f"视频写出失败：无法创建 VideoWriter（路径不可写或编码器不支持）：{out_path}"
+        )
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            dets = predictor.predict_image(frame, conf=conf)
+            annotated = draw_dets(frame, dets, predictor.names)
+            writer.write(annotated)
+    finally:
+        cap.release()
+        writer.release()
     return True
 
 

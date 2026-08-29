@@ -30,6 +30,7 @@ from ..core.theme import (
     get_ui_scale,
     setup_matplotlib,
 )
+from ..core.tk_safe import safe_ui
 from ..core.yolo_engine import DEFAULT_MODEL
 
 
@@ -164,28 +165,37 @@ class CompareTool:
         media = MediaItem(path=self.media_path, kind=getattr(self, "_media_kind", "image"))
 
         def work():
-            self.status.config(text="正在运行对比…")
-            report = compare(
-                model_a,
-                model_b,
-                media,
-                device=self.ctx.device_info.device_arg(),
-            )
-            self._report = report
+            safe_ui(self.win, lambda: self.status.config(text="正在运行对比…"))
+            try:
+                report = compare(
+                    model_a,
+                    model_b,
+                    media,
+                    device=self.ctx.device_info.device_arg(),
+                )
+                self._report = report
 
-            def ui():
-                self.analysis_text.delete("1.0", tk.END)
-                self.analysis_text.insert(tk.END, report.analysis + "\n\n--- 改进建议 ---\n")
-                for s in report.suggestions:
-                    self.analysis_text.insert(tk.END, f"• {s}\n")
-                if report.overlay_image is not None:
-                    photo = _cv2_to_tk(report.overlay_image)
-                    self._photo = photo
-                    self.preview.config(image=photo, text="")
-                self._draw_chart(report)
-                self.status.config(text=f"已对比 {report.frames_compared} 帧")
+                def ui():
+                    self.analysis_text.delete("1.0", tk.END)
+                    self.analysis_text.insert(tk.END, report.analysis + "\n\n--- 改进建议 ---\n")
+                    for s in report.suggestions:
+                        self.analysis_text.insert(tk.END, f"• {s}\n")
+                    if report.overlay_image is not None:
+                        photo = _cv2_to_tk(report.overlay_image)
+                        self._photo = photo
+                        self.preview.config(image=photo, text="")
+                    self._draw_chart(report)
+                    self.status.config(text=f"已对比 {report.frames_compared} 帧")
 
-            self.win.after(0, ui)
+                safe_ui(self.win, ui)
+            except Exception as exc:
+                err = str(exc)
+
+                def fail_ui(e=err):
+                    self.status.config(text=f"对比失败：{e}")
+                    messagebox.showerror("对比", f"对比失败：{e}")
+
+                safe_ui(self.win, fail_ui)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -207,26 +217,35 @@ class CompareTool:
             return
         p = filedialog.asksaveasfilename(defaultextension=".html", filetypes=[("HTML", "*.html")])
         if p:
-            chart_p = str(Path(p).with_suffix(".png"))
-            self.fig.savefig(chart_p)
-            export_report_html(self._report, p, chart_p)
-            messagebox.showinfo("导出", f"已保存到 {p}")
+            try:
+                chart_p = str(Path(p).with_suffix(".png"))
+                self.fig.savefig(chart_p)
+                export_report_html(self._report, p, chart_p)
+                messagebox.showinfo("导出", f"已保存到 {p}")
+            except Exception as exc:
+                messagebox.showerror("导出失败", f"报告导出失败：{exc}")
 
     def _export_text(self) -> None:
         if not self._report:
             return
         p = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("文本", "*.txt")])
         if p:
-            with open(p, "w", encoding="utf-8") as f:
-                f.write(self._report.analysis + "\n\n")
-                for s in self._report.suggestions:
-                    f.write(f"- {s}\n")
-            messagebox.showinfo("导出", f"已保存到 {p}")
+            try:
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(self._report.analysis + "\n\n")
+                    for s in self._report.suggestions:
+                        f.write(f"- {s}\n")
+                messagebox.showinfo("导出", f"已保存到 {p}")
+            except Exception as exc:
+                messagebox.showerror("导出失败", f"报告导出失败：{exc}")
 
     def _export_chart(self) -> None:
         if not self._report:
             return
         p = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG", "*.png")])
         if p:
-            self.fig.savefig(p)
-            messagebox.showinfo("导出", f"图表已保存到 {p}")
+            try:
+                self.fig.savefig(p)
+                messagebox.showinfo("导出", f"图表已保存到 {p}")
+            except Exception as exc:
+                messagebox.showerror("导出失败", f"报告导出失败：{exc}")

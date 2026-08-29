@@ -89,7 +89,7 @@ def default_params(dataset: Optional[str] = None) -> tuple[dict, dict]:
         "fliplr": 0.5,
         "mosaic": 1.0,
         "mixup": 0.0,
-        "workers": 4,
+        "workers": 2,
         "pretrained": True,
         "model": "yolov8n.pt",
     }
@@ -104,6 +104,7 @@ def default_params(dataset: Optional[str] = None) -> tuple[dict, dict]:
         "weight_decay": "0.0005 正则化权重，小数据集不易欠拟合。",
         "warmup_epochs": "3 轮预热可稳定早期训练。",
         "patience": "验证指标 20 轮无提升则早停。",
+        "workers": "推荐 workers=2，Windows 上过高会占满进程；可在 0–16 调节。",
     }
     return params, rationale
 
@@ -131,7 +132,7 @@ def build_train_args(params: dict, dataset_yaml: str, project: str, name: str, d
         "fliplr": float(params.get("fliplr", 0.5)),
         "mosaic": float(params.get("mosaic", 1.0)),
         "mixup": float(params.get("mixup", 0.0)),
-        "workers": int(params.get("workers", 4)),
+        "workers": max(0, min(16, int(params.get("workers", 2)))),
         "pretrained": bool(params.get("pretrained", True)),
         "project": project,
         "name": name,

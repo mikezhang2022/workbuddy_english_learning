@@ -18,7 +18,7 @@ from PIL import Image, ImageTk
 from ..core.augment import AugConfig, estimate_new_samples, preview, run as augment_run
 from ..core.context import AppContext
 from ..core.dataset_qc import apply_fixes, check as dataset_check
-from ..core.io_utils import MediaItem, extract_frames, imread_unicode, list_media
+from ..core.io_utils import IMAGE_EXTS, MediaItem, extract_frames, imread_unicode, list_media
 from ..core.theme import (
     ACCENT,
     BG,
@@ -34,6 +34,7 @@ from ..core.theme import (
     get_font_size,
     get_ui_scale,
 )
+from ..core.tk_safe import safe_ui
 from ..core.yolo_engine import (
     DEFAULT_MODEL,
     Predictor,
@@ -201,8 +202,7 @@ class ImageTool:
             )
 
     def _set_status(self, msg: str) -> None:
-        self.status.config(text=msg)
-        self.win.update_idletasks()
+        safe_ui(self.win, lambda: self.status.config(text=msg))
 
     def _import_image(self) -> None:
         paths = filedialog.askopenfilenames(
@@ -271,7 +271,7 @@ class ImageTool:
         def work():
             self._set_status("正在加载模型…")
             self.predictor.load(self.model_path or None)
-            self.win.after(0, lambda: self._update_model_status())
+            safe_ui(self.win, self._update_model_status)
             for i, item in enumerate(self.items):
                 self._set_status(f"正在标注 {i+1}/{len(self.items)}：{item.name}")
                 if item.kind == "image":
@@ -316,9 +316,18 @@ class ImageTool:
 
         def work():
             self._set_status("正在导出标注视频…")
-            self.predictor.load(self.model_path or None)
-            ok = annotate_video(item.path, out, self.predictor)
-            self._set_status("视频已导出" if ok else "导出失败")
+            try:
+                self.predictor.load(self.model_path or None)
+                annotate_video(item.path, out, self.predictor)
+                self._set_status("视频已导出")
+                safe_ui(self.win, lambda: messagebox.showinfo("导出", f"视频已导出到：\n{out}"))
+            except Exception as exc:
+                err = str(exc)
+                self._set_status(f"导出失败：{err}")
+                safe_ui(
+                    self.win,
+                    lambda e=err: messagebox.showerror("视频写出失败", f"视频写出失败：{e}"),
+                )
 
         if out:
             threading.Thread(target=work, daemon=True).start()
@@ -328,10 +337,14 @@ class ImageTool:
             self._set_status("正在运行质检…")
             report = dataset_check(self.images_dir, self.labels_dir)
             text = report.summary()
-            self.qc_text.delete("1.0", tk.END)
-            self.qc_text.insert(tk.END, text)
-            self._last_report = report
-            self._set_status("质检完成")
+
+            def ui():
+                self.qc_text.delete("1.0", tk.END)
+                self.qc_text.insert(tk.END, text)
+                self._last_report = report
+                self.status.config(text="质检完成")
+
+            safe_ui(self.win, ui)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -382,7 +395,7 @@ class ImageTool:
             self._set_status("正在运行数据增强…")
             n = augment_run(self.images_dir, self.labels_dir, cfg, mult)
             self._set_status(f"已生成 {n} 个新样本")
-            self._update_aug_estimate()
+            safe_ui(self.win, self._update_aug_estimate)
             self._check_insufficient_data()
 
         threading.Thread(target=work, daemon=True).start()
@@ -395,17 +408,54 @@ class ImageTool:
                 f"数据集仅有 {n} 张图片（少于 {threshold}）。\n"
                 "建议：在「数据增强」选项卡中启用增强，准备就绪后再导出。"
             )
-            self.win.after(0, lambda: messagebox.showinfo("样本不足", msg))
+            safe_ui(self.win, lambda: messagebox.showinfo("样本不足", msg))
+
+    def _class_name_lookup(self) -> dict:
+        """优先用已加载模型的类别名（含 COCO），否则回退 class_<id>。"""
+        names = dict(self.predictor.names or {})
+        # ultralytics 可能是 {0: 'person'} 或 {'0': 'person'}
+        out = {}
+        for k, v in names.items():
+            try:
+                out[int(k)] = str(v)
+            except (TypeError, ValueError):
+                continue
+        return out
 
     def _export_dataset(self) -> None:
-        imgs = [p for p in self.images_dir.iterdir() if p.is_file()]
+        imgs = [
+            p
+            for p in self.images_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTS
+        ]
         if not imgs:
             messagebox.showwarning("导出", "数据集中没有图片")
             return
+
+        # 扫描全部标签，收集原始 class id，建立连续索引映射
+        orig_ids: set[int] = set()
+        for lbl in self.labels_dir.glob("*.txt"):
+            for line in lbl.read_text(encoding="utf-8").splitlines():
+                parts = line.split()
+                if not parts:
+                    continue
+                try:
+                    orig_ids.add(int(parts[0]))
+                except ValueError:
+                    continue
+        id_map = {old: new for new, old in enumerate(sorted(orig_ids))}
+        name_lookup = self._class_name_lookup()
+        names_list = [
+            name_lookup.get(old, f"class_{old}") for old in sorted(orig_ids)
+        ]
+
         random.shuffle(imgs)
-        split = max(1, int(len(imgs) * 0.2))
-        val_imgs = imgs[:split]
-        train_imgs = imgs[split:]
+        split = max(1, int(len(imgs) * 0.2)) if len(imgs) > 1 else 0
+        if len(imgs) == 1:
+            val_imgs, train_imgs = [], imgs
+        else:
+            val_imgs = imgs[:split]
+            train_imgs = imgs[split:] or imgs[:1]
 
         export_root = self.ctx.subdir("export")
         for split_name, subset in [("train", train_imgs), ("val", val_imgs)]:
@@ -416,19 +466,28 @@ class ImageTool:
             for img in subset:
                 shutil.copy2(img, idir / img.name)
                 lbl = self.labels_dir / (img.stem + ".txt")
-                if lbl.exists():
-                    shutil.copy2(lbl, ldir / lbl.name)
-
-        classes: dict = {}
-        for lbl in self.labels_dir.glob("*.txt"):
-            for line in lbl.read_text(encoding="utf-8").splitlines():
-                parts = line.split()
-                if parts:
-                    cid = int(parts[0])
-                    classes.setdefault(cid, f"class_{cid}")
+                if not lbl.exists():
+                    continue
+                # 重写标签：原始 id → 连续 0..nc-1
+                new_lines = []
+                for line in lbl.read_text(encoding="utf-8").splitlines():
+                    parts = line.strip().split()
+                    if len(parts) < 5:
+                        continue
+                    try:
+                        old_id = int(parts[0])
+                    except ValueError:
+                        continue
+                    if old_id not in id_map:
+                        continue
+                    new_id = id_map[old_id]
+                    new_lines.append(f"{new_id} " + " ".join(parts[1:]))
+                (ldir / lbl.name).write_text(
+                    ("\n".join(new_lines) + "\n") if new_lines else "",
+                    encoding="utf-8",
+                )
 
         yaml_path = export_root / "data.yaml"
-        names_list = [classes[i] for i in sorted(classes)]
         yaml_content = (
             f"path: {export_root}\n"
             f"train: images/train\n"

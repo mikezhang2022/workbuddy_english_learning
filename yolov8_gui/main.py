@@ -9,6 +9,7 @@ import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, ttk
+from typing import Optional
 
 # Ensure package root on path when run as script
 _ROOT = Path(__file__).resolve().parent
@@ -17,7 +18,7 @@ if str(_ROOT.parent) not in sys.path:
 
 from yolov8_gui.core.app_config import load_config
 from yolov8_gui.core.context import AppContext
-from yolov8_gui.core.device import probe_async
+from yolov8_gui.core.device import DeviceInfo, probe_async
 from yolov8_gui.core.settings_dialog import SettingsDialog
 from yolov8_gui.core.theme import (
     ACCENT,
@@ -33,6 +34,7 @@ from yolov8_gui.core.theme import (
     f,
     scaled,
 )
+from yolov8_gui.core.tk_safe import ProbeQueue
 from yolov8_gui.core.version import __version__
 from yolov8_gui.tools.compare_tool import CompareTool
 from yolov8_gui.tools.image_tool import ImageTool
@@ -55,9 +57,11 @@ class Launcher:
         configure_theme(self.root, font_size=self.cfg["font_size"], ui_scale=self.cfg["ui_scale"])
         center_window(self.root, self.BASE_WIDTH, self.BASE_HEIGHT)
 
+        self._probe_bridge: Optional[ProbeQueue] = None
+
         self._register_tools()
         self._build_ui()
-        probe_async(self._on_probe_done)
+        self._start_env_probe()
 
         if direct_tool:
             self.root.after(300, lambda: self._open(direct_tool))
@@ -177,9 +181,14 @@ class Launcher:
         center_window(self.root, self.BASE_WIDTH, self.BASE_HEIGHT)
         # 重建主界面以刷新 tk.Label / Text 等非 ttk 控件字体与间距
         probe_info = getattr(self.ctx, "device_info", None)
+        if self._probe_bridge is not None:
+            self._probe_bridge.stop()
+            self._probe_bridge = None
         self._build_ui()
         if probe_info is not None and getattr(probe_info, "python_version", None):
             self._fill_env(probe_info)
+        else:
+            self._start_env_probe()
 
     def _browse_workspace(self) -> None:
         d = filedialog.askdirectory()
@@ -190,9 +199,14 @@ class Launcher:
         self.ctx.set_workspace(self.ws_var.get())
         self.env_text.insert(tk.END, f"\n工作区已设为：{self.ctx.workspace}\n")
 
-    def _fill_env(self, info) -> None:
+    def _fill_env(self, info: DeviceInfo) -> None:
+        """必须在主线程调用：用真实设备信息替换「正在检测环境…」。"""
         self.env_text.delete("1.0", tk.END)
         self.env_text.insert(tk.END, f"软件版本：v{__version__}\n")
+        if not getattr(info, "python_version", None):
+            reason = getattr(info, "error", None) or "未知错误"
+            self.env_text.insert(tk.END, f"环境检测失败：{reason}\n")
+            return
         for line in info.summary_lines():
             self.env_text.insert(tk.END, line + "\n")
         if not info.cuda_available:
@@ -201,13 +215,33 @@ class Launcher:
                 "\n⚠ 未检测到 CUDA — 训练/推理将使用 CPU（速度较慢）。\n",
             )
 
-    def _on_probe_done(self, info) -> None:
+    def _start_env_probe(self) -> None:
+        """后台探测 + 队列；主线程轮询消费，绝不在子线程碰 Tk。"""
+        if self._probe_bridge is not None:
+            self._probe_bridge.stop()
+        self._probe_bridge = ProbeQueue(self.root, self._consume_probe_result, interval_ms=120)
+        self._probe_bridge.start()
+        probe_async(self._on_probe_done)
+
+    def _on_probe_done(self, info: DeviceInfo) -> None:
+        # 仅在后台线程：写入队列，不触碰任何 Tk 控件
+        if self._probe_bridge is not None:
+            self._probe_bridge.put(info)
+        else:
+            # 桥接尚未建立时仍入队到 ctx，等 UI 就绪再填
+            self.ctx.device_info = info
+
+    def _consume_probe_result(self, info: DeviceInfo) -> None:
+        """主线程轮询回调。"""
         self.ctx.device_info = info
-
-        def ui():
+        try:
             self._fill_env(info)
-
-        self.root.after(0, ui)
+        except Exception as exc:
+            try:
+                self.env_text.delete("1.0", tk.END)
+                self.env_text.insert(tk.END, f"软件版本：v{__version__}\n环境检测失败：{exc}\n")
+            except Exception:
+                pass
 
     def _open(self, key: str) -> None:
         kwargs = {}

@@ -23,6 +23,7 @@ class DeviceInfo:
     ultralytics_version: str
     error: Optional[str] = None
     gpu_via_smi: bool = False
+    cudnn_version: Optional[str] = None
 
     def device_arg(self) -> int | str:
         """Return ultralytics device argument."""
@@ -35,6 +36,8 @@ class DeviceInfo:
             f"CUDA：{'是' if self.cuda_available else '否'}"
             + (f"（{self.cuda_version}）" if self.cuda_version else ""),
         ]
+        if self.cudnn_version:
+            lines.append(f"cuDNN：{self.cudnn_version}")
         if self.cuda_available:
             if self.gpu_name:
                 lines.append(f"GPU：{self.gpu_name}")
@@ -116,6 +119,7 @@ def probe() -> DeviceInfo:
     torch_version = "未安装"
     cuda_available = False
     cuda_version: Optional[str] = None
+    cudnn_version: Optional[str] = None
     gpu_name: Optional[str] = None
     gpu_mem_total_gb: Optional[float] = None
     gpu_mem_free_gb: Optional[float] = None
@@ -128,6 +132,11 @@ def probe() -> DeviceInfo:
 
         torch_version = torch.__version__
         cuda_available = torch.cuda.is_available()
+        try:
+            if torch.backends.cudnn.is_available():
+                cudnn_version = str(torch.backends.cudnn.version())
+        except Exception:
+            cudnn_version = None
         if cuda_available:
             cuda_version = torch.version.cuda
             try:
@@ -189,6 +198,7 @@ def probe() -> DeviceInfo:
         ultralytics_version=ultralytics_version,
         error=error,
         gpu_via_smi=gpu_via_smi,
+        cudnn_version=cudnn_version,
     )
 
 
@@ -199,10 +209,25 @@ def os_cpu_count() -> int:
 
 
 def probe_async(cb: Callable[[DeviceInfo], None]) -> threading.Thread:
-    """Run probe in background thread and invoke callback on main thread via cb."""
+    """Run probe in background thread; callback receives result (do not touch Tk in cb)."""
 
     def _worker():
-        info = probe()
+        try:
+            info = probe()
+        except Exception as exc:
+            info = DeviceInfo(
+                python_version="",
+                torch_version="未知",
+                cuda_available=False,
+                cuda_version=None,
+                gpu_name=None,
+                gpu_mem_total_gb=None,
+                gpu_mem_free_gb=None,
+                cpu_count=os_cpu_count(),
+                ram_total_gb=None,
+                ultralytics_version="未知",
+                error=str(exc),
+            )
         cb(info)
 
     t = threading.Thread(target=_worker, daemon=True)

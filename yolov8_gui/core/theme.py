@@ -180,10 +180,39 @@ def configure_theme(
 
 
 def setup_matplotlib() -> None:
+    import logging
+    import warnings
+
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+
+    preferred = [
+        "SimHei",
+        "Microsoft YaHei",
+        "WenQuanYi Zen Hei",
+        "Noto Sans CJK SC",
+        "Source Han Sans SC",
+        "Source Han Sans CN",
+        "Arial Unicode MS",
+        "DejaVu Sans",
+        "sans-serif",
+    ]
+    available: list[str] = []
+    try:
+        system_fonts = {f.name for f in font_manager.fontManager.ttflist}
+        for name in preferred:
+            if name == "sans-serif" or name in system_fonts:
+                available.append(name)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("探测中文字体失败，将使用默认字体：%s", exc)
+        available = ["DejaVu Sans", "sans-serif"]
+
+    if not available:
+        available = ["sans-serif"]
+        warnings.warn("未找到可用中文字体，图表中文可能显示为方框", UserWarning)
 
     plt.rcParams.update(
         {
@@ -197,6 +226,8 @@ def setup_matplotlib() -> None:
             "grid.color": BORDER,
             "legend.facecolor": "#ffffff",
             "legend.edgecolor": BORDER,
+            "font.sans-serif": available,
+            "axes.unicode_minus": False,
         }
     )
 
