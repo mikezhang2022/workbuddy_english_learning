@@ -18,6 +18,7 @@ if str(_ROOT.parent) not in sys.path:
 from yolov8_gui.core.context import AppContext
 from yolov8_gui.core.device import probe, probe_async
 from yolov8_gui.core.theme import ACCENT, ACCENT2, BG, BG_CARD, BORDER, FG, FG_DIM, SELECT, WARN, apply_theme, center_window, enable_dpi, f
+from yolov8_gui.core.version import __version__
 from yolov8_gui.tools.compare_tool import CompareTool
 from yolov8_gui.tools.image_tool import ImageTool
 from yolov8_gui.tools.train_tool import TrainTool
@@ -28,7 +29,7 @@ class Launcher:
 
     def __init__(self, direct_tool: str | None = None) -> None:
         self.root = tk.Tk()
-        self.root.title("YOLOv8 可视化工作台")
+        self.root.title(f"YOLOv8 可视化工作台 v{__version__}")
         enable_dpi(self.root)
         apply_theme(self.root)
         center_window(self.root, 960, 680)
@@ -56,7 +57,7 @@ class Launcher:
         ttk.Label(header, text="YOLOv8 可视化工作台", style="Title.TLabel").pack(anchor=tk.W)
         ttk.Label(
             header,
-            text="导入 · 训练 · 对比 — 统一的 YOLOv8 工作流工作区",
+            text=f"导入 · 训练 · 对比 — 统一的 YOLOv8 工作流工作区  |  v{__version__}",
             style="Dim.TLabel",
         ).pack(anchor=tk.W)
 
@@ -80,8 +81,8 @@ class Launcher:
             card.grid(row=0, column=i, padx=8, pady=8, sticky="nsew")
             cards.columnconfigure(i, weight=1)
 
-            tk.Label(card, text=title, bg=BG_CARD, fg=color, font=f(13, "bold")).pack(anchor=tk.W, padx=12, pady=(12, 4))
-            tk.Label(card, text=desc, bg=BG_CARD, fg=FG_DIM, font=f(9), wraplength=240, justify=tk.LEFT).pack(
+            tk.Label(card, text=title, bg=BG_CARD, fg=color, font=f(14, "bold")).pack(anchor=tk.W, padx=12, pady=(12, 4))
+            tk.Label(card, text=desc, bg=BG_CARD, fg=FG_DIM, font=f(11), wraplength=240, justify=tk.LEFT).pack(
                 anchor=tk.W, padx=12, pady=4
             )
             btn = tk.Button(
@@ -92,17 +93,27 @@ class Launcher:
                 activebackground=SELECT,
                 activeforeground=FG,
                 relief=tk.FLAT,
-                font=f(10, "bold"),
+                font=f(12, "bold"),
                 command=lambda k=key: self._open(k),
             )
             btn.pack(anchor=tk.W, padx=12, pady=(4, 12))
 
         env_frame = ttk.LabelFrame(self.root, text="环境 / 硬件", padding=10)
         env_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=8)
-        self.env_text = tk.Text(env_frame, height=10, bg=BG_CARD, fg=FG, wrap=tk.WORD, font=f(9),
-                                insertbackground=FG, highlightbackground=BORDER, relief=tk.FLAT, bd=1)
+        self.env_text = tk.Text(
+            env_frame,
+            height=10,
+            bg=BG_CARD,
+            fg=FG,
+            wrap=tk.WORD,
+            font=f(12),
+            insertbackground=FG,
+            highlightbackground=BORDER,
+            relief=tk.FLAT,
+            bd=1,
+        )
         self.env_text.pack(fill=tk.BOTH, expand=True)
-        self.env_text.insert(tk.END, "正在检测环境…\n")
+        self.env_text.insert(tk.END, f"软件版本：v{__version__}\n正在检测环境…\n")
 
         footer = ttk.Label(
             self.root,
@@ -125,6 +136,7 @@ class Launcher:
 
         def ui():
             self.env_text.delete("1.0", tk.END)
+            self.env_text.insert(tk.END, f"软件版本：v{__version__}\n")
             for line in info.summary_lines():
                 self.env_text.insert(tk.END, line + "\n")
             if not info.cuda_available:

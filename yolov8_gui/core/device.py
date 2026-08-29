@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import platform
-import sys
+import subprocess
 import threading
 from dataclasses import dataclass, asdict
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 
 @dataclass
@@ -22,6 +22,7 @@ class DeviceInfo:
     ram_total_gb: Optional[float]
     ultralytics_version: str
     error: Optional[str] = None
+    gpu_via_smi: bool = False
 
     def device_arg(self) -> int | str:
         """Return ultralytics device argument."""
@@ -34,11 +35,25 @@ class DeviceInfo:
             f"CUDA：{'是' if self.cuda_available else '否'}"
             + (f"（{self.cuda_version}）" if self.cuda_version else ""),
         ]
-        if self.gpu_name:
-            lines.append(f"GPU：{self.gpu_name}")
-        if self.gpu_mem_total_gb is not None:
-            free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
-            lines.append(f"显存：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
+        if self.cuda_available:
+            if self.gpu_name:
+                lines.append(f"GPU：{self.gpu_name}")
+            if self.gpu_mem_total_gb is not None:
+                free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
+                lines.append(f"显存：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
+        elif self.gpu_via_smi:
+            if self.gpu_name:
+                lines.append(f"GPU（nvidia-smi）：{self.gpu_name}")
+            if self.gpu_mem_total_gb is not None:
+                free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
+                lines.append(f"显存（nvidia-smi）：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
+            lines.append("CUDA（PyTorch）：暂不可用，详见提示")
+        else:
+            if self.gpu_name:
+                lines.append(f"GPU：{self.gpu_name}")
+            if self.gpu_mem_total_gb is not None:
+                free = self.gpu_mem_free_gb if self.gpu_mem_free_gb is not None else 0
+                lines.append(f"显存：可用 {free:.1f} / 总计 {self.gpu_mem_total_gb:.1f} GB")
         lines.append(f"CPU 核心数：{self.cpu_count}")
         if self.ram_total_gb is not None:
             lines.append(f"内存：{self.ram_total_gb:.1f} GB")
@@ -65,6 +80,34 @@ def _ram_total_gb() -> Optional[float]:
     return None
 
 
+def _probe_nvidia_smi() -> Tuple[Optional[str], Optional[float], Optional[float]]:
+    """Parse first GPU from nvidia-smi: (name, total_gb, free_gb)."""
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        if result.returncode != 0 or not (result.stdout or "").strip():
+            return None, None, None
+        line = result.stdout.strip().splitlines()[0]
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 3:
+            return None, None, None
+        name = parts[0]
+        total_gb = float(parts[1]) / 1024.0
+        free_gb = float(parts[2]) / 1024.0
+        return name, total_gb, free_gb
+    except Exception:
+        return None, None, None
+
+
 def probe() -> DeviceInfo:
     """Synchronously probe runtime environment."""
     python_version = platform.python_version()
@@ -78,6 +121,7 @@ def probe() -> DeviceInfo:
     gpu_mem_free_gb: Optional[float] = None
     ultralytics_version = "未安装"
     error: Optional[str] = None
+    gpu_via_smi = False
 
     try:
         import torch
@@ -96,6 +140,31 @@ def probe() -> DeviceInfo:
                 error = f"GPU 检测不完整：{exc}"
     except Exception as exc:
         error = f"PyTorch 不可用：{exc}"
+
+    if not cuda_available:
+        smi_name, smi_total, smi_free = _probe_nvidia_smi()
+        if smi_name:
+            gpu_name = smi_name
+            gpu_mem_total_gb = smi_total
+            gpu_mem_free_gb = smi_free
+            gpu_via_smi = True
+            smi_hint = (
+                f"检测到 NVIDIA GPU（{gpu_name}），但 PyTorch 当前无法使用 CUDA。"
+                "常见原因：PyTorch 与本地 NVIDIA 驱动/CUDA 版本不匹配；未安装对应 cuDNN；"
+                "多显卡（笔记本集显/独显）导致 torch 默认未选中独显。"
+                "建议重新安装匹配版本，例如："
+                "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121"
+            )
+            if error:
+                error = f"{error}；{smi_hint}"
+            else:
+                error = smi_hint
+        else:
+            no_gpu = "未检测到 NVIDIA GPU（torch.cuda 不可用，且 nvidia-smi 未返回 GPU 信息）。"
+            if error:
+                error = f"{error}；{no_gpu}"
+            else:
+                error = no_gpu
 
     try:
         import ultralytics
@@ -119,6 +188,7 @@ def probe() -> DeviceInfo:
         ram_total_gb=ram_total_gb,
         ultralytics_version=ultralytics_version,
         error=error,
+        gpu_via_smi=gpu_via_smi,
     )
 
 
