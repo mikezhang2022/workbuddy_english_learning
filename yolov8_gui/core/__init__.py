@@ -1,5 +1,13 @@
 """Core package public API."""
 
+from .annotation_review import (
+    Annotation,
+    delete_below_threshold,
+    draw_preview,
+    load_annotations,
+    remap_class_names_to_ids,
+    save_annotations,
+)
 from .augment import AugConfig, estimate_new_samples, preview, run as augment_run
 from .compare import CompareReport, CompareStats, compare, export_report_html
 from .context import AppContext
@@ -33,6 +41,7 @@ from .yolo_engine import (
 )
 
 __all__ = [
+    "Annotation",
     "AppContext",
     "AugConfig",
     "AdviceItem",
@@ -61,7 +70,9 @@ __all__ = [
     "configure_theme",
     "dataset_check",
     "default_params",
+    "delete_below_threshold",
     "draw_dets",
+    "draw_preview",
     "enable_dpi",
     "estimate_new_samples",
     "export_report_html",
@@ -72,12 +83,15 @@ __all__ = [
     "imread_unicode",
     "imwrite_unicode",
     "list_media",
+    "load_annotations",
     "load_config",
     "load_model",
     "model_display_name",
     "preview",
     "probe",
     "probe_async",
+    "remap_class_names_to_ids",
+    "save_annotations",
     "save_config",
     "setup_matplotlib",
     "validate_params",

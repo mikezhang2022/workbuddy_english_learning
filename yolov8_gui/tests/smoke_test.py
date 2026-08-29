@@ -127,6 +127,70 @@ class TestContext(unittest.TestCase):
             self.assertEqual(ctx2.last_dataset_yaml, "/tmp/data.yaml")
 
 
+class TestAnnotationReview(unittest.TestCase):
+    """模拟创建临时图片+txt：加载、删低置信度框、保存，校验内容。"""
+
+    def test_load_delete_low_conf_save(self):
+        from yolov8_gui.core.annotation_review import (
+            delete_below_threshold,
+            draw_preview,
+            load_annotations,
+            remap_class_names_to_ids,
+            save_annotations,
+        )
+        from yolov8_gui.core.version import __version__
+        import cv2
+
+        self.assertEqual(__version__, "1.0.5")
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            images = root / "images"
+            labels = root / "labels"
+            images.mkdir()
+            labels.mkdir()
+
+            img_path = images / "sample.jpg"
+            cv2.imwrite(str(img_path), np.full((64, 64, 3), 120, dtype=np.uint8))
+
+            # 含置信度的扩展 YOLO 行：高 conf + 低 conf
+            (labels / "sample.txt").write_text(
+                "0 0.50 0.50 0.40 0.40 0.90\n"
+                "1 0.20 0.20 0.10 0.10 0.15\n"
+                "2 0.80 0.80 0.12 0.12 0.10\n",
+                encoding="utf-8",
+            )
+
+            names = ["cat", "dog", "bird"]
+            anns = load_annotations(img_path, labels, names)
+            self.assertEqual(len(anns), 3)
+            self.assertEqual(anns[0].cls_name, "cat")
+            self.assertAlmostEqual(anns[1].conf, 0.15)
+
+            kept = delete_below_threshold(anns, 0.25)
+            self.assertEqual(len(kept), 1)
+            self.assertEqual(kept[0].cls_id, 0)
+
+            save_annotations(img_path, labels, kept, with_conf=False)
+            text = (labels / "sample.txt").read_text(encoding="utf-8").strip()
+            parts = text.split()
+            self.assertEqual(len(parts), 5)
+            self.assertEqual(parts[0], "0")
+            self.assertAlmostEqual(float(parts[1]), 0.5, places=4)
+
+            # 再读回（无 conf 列时默认 1.0）
+            reloaded = load_annotations(img_path, labels, names)
+            self.assertEqual(len(reloaded), 1)
+            self.assertAlmostEqual(reloaded[0].conf, 1.0)
+
+            preview = draw_preview(img_path, kept, conf_threshold=0.25, class_names=names)
+            self.assertIsNotNone(preview)
+            self.assertEqual(preview.shape[:2], (64, 64))
+
+            mapping = remap_class_names_to_ids(names)
+            self.assertEqual(mapping["dog"], 1)
+
+
 def run_compileall() -> int:
     import compileall
 

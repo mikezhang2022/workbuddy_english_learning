@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
+from ..core.annotation_review import AnnotationReviewPanel
 from ..core.augment import AugConfig, estimate_new_samples, preview, run as augment_run
 from ..core.context import AppContext
 from ..core.dataset_qc import apply_fixes, check as dataset_check
@@ -150,8 +151,15 @@ class ImageTool:
         )
         ttk.Button(btn_row, text="导出标注视频", command=self._export_video).pack(side=tk.LEFT, padx=2)
 
-        paned = ttk.PanedWindow(self.win, orient=tk.HORIZONTAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+        # 主 Notebook：标注与质检 | 标注审核
+        self.main_nb = ttk.Notebook(self.win)
+        self.main_nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
+
+        work_tab = ttk.Frame(self.main_nb)
+        self.main_nb.add(work_tab, text="标注与质检")
+
+        paned = ttk.PanedWindow(work_tab, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
 
         left = ttk.Frame(paned)
         paned.add(left, weight=1)
@@ -216,9 +224,47 @@ class ImageTool:
             export_frame, text="发送到模型训练工具 →", command=self._send_to_train, style="Accent.TButton"
         ).pack(fill=tk.X)
 
+        # 标注审核页签
+        review_tab = ttk.Frame(self.main_nb)
+        self.main_nb.add(review_tab, text="标注审核")
+        self.review_panel = AnnotationReviewPanel(
+            review_tab,
+            images_dir=self.images_dir,
+            labels_dir=self.labels_dir,
+            get_predictor=lambda: self.predictor,
+            get_model_path=lambda: self.model_path or self.model_var.get() or None,
+            get_data_yaml=self._resolve_data_yaml,
+            root=self.win,
+            on_status=self._set_status,
+        )
+        self.main_nb.bind("<<NotebookTabChanged>>", self._on_main_tab_changed)
+
         self.status = ttk.Label(self.win, text="就绪", style="Dim.TLabel")
         self.status.pack(fill=tk.X, padx=8, pady=4)
         self._update_model_status()
+
+    def _resolve_data_yaml(self) -> Optional[str]:
+        """优先工作区导出的 data.yaml，其次 dataset/data.yaml。"""
+        if self.ctx.last_dataset_yaml and Path(self.ctx.last_dataset_yaml).is_file():
+            return self.ctx.last_dataset_yaml
+        local = self.dataset_dir / "data.yaml"
+        if local.is_file():
+            return str(local)
+        export_yaml = self.ctx.subdir("export") / "data.yaml"
+        if export_yaml.is_file():
+            return str(export_yaml)
+        return None
+
+    def _on_main_tab_changed(self, _evt=None) -> None:
+        try:
+            tab_id = self.main_nb.select()
+            tab_text = self.main_nb.tab(tab_id, "text")
+        except Exception:
+            return
+        if tab_text == "标注审核":
+            self.review_panel.on_tab_activated()
+        else:
+            self.review_panel.on_tab_deactivated()
 
     def _browse_model(self) -> None:
         p = filedialog.askopenfilename(filetypes=[("PyTorch", "*.pt"), ("全部", "*.*")])
@@ -543,7 +589,11 @@ class ImageTool:
                     if old_id not in id_map:
                         continue
                     new_id = id_map[old_id]
-                    new_lines.append(f"{new_id} " + " ".join(parts[1:]))
+                    # 仅保留 YOLO 标准 5 列（忽略审核用的 conf 第 6 列）
+                    coords = parts[1:5]
+                    if len(coords) < 4:
+                        continue
+                    new_lines.append(f"{new_id} " + " ".join(coords))
                 (ldir / lbl.name).write_text(
                     ("\n".join(new_lines) + "\n") if new_lines else "",
                     encoding="utf-8",

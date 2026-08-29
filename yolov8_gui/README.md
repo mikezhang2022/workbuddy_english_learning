@@ -1,6 +1,6 @@
 # YOLOv8 可视化工作台
 
-面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.4**）。
+面向 YOLOv8 工作流的桌面应用：导入与标注数据、训练模型、双模型并排对比。基于 **Tkinter (ttk)**、**Ultralytics YOLOv8** 与 **PyTorch**，界面为简体中文浅色主题（当前版本 **v1.0.5**）。
 
 更完整的操作说明见 [USER_MANUAL.md](USER_MANUAL.md)。
 
@@ -203,7 +203,7 @@ from yolov8_gui.core.device import probe
 import tempfile
 from pathlib import Path
 
-assert __version__ == "1.0.4", __version__
+assert __version__ == "1.0.5", __version__
 
 # configure_theme 改变全局字号（无需真正弹出窗口时用 Tk 根或 mock）
 import tkinter as tk
@@ -227,7 +227,7 @@ PY
 
 **通过标准**：
 
-- `__version__ == "1.0.4"`
+- `__version__ == "1.0.5"`
 - `configure_theme(..., font_size=20)` 后 `get_font_size() == 20`
 - `save_config` → `load_config` 往返一致（字号 / 缩放）
 - `probe()` **不抛异常**
@@ -247,7 +247,7 @@ python main.py
 
 **检查项**：
 
-1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.4`**。
+1. **主窗口标题**含 `YOLOv8 可视化工作台` 与 **`v1.0.5`**。
 2. **浅色主题**（浅灰/白底、深色文字），非深色模式。
 3. 主界面有 **三张工具卡片**：「图片/视频工具」「模型训练工具」「模型对比工具」，各有「打开」。
 4. 底部 **「环境 / 硬件」** 文本框显示 **Python**、**CPU**、**CUDA**（是/否）等；**无 GPU 时有中文提示且进程不崩溃**。
@@ -322,8 +322,8 @@ python main.py
 执行者在全部完成后勾选：
 
 - [ ] `python -m compileall yolov8_gui` 成功，且 `python yolov8_gui/tests/smoke_test.py` 报告 **Ran 8 tests … OK**
-- [ ] 启动健康检查脚本通过（`__version__=="1.0.4"`、主题字号、配置往返、`probe()`）
-- [ ] GUI 启动：标题含 v1.0.4、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
+- [ ] 启动健康检查脚本通过（`__version__=="1.0.5"`、主题字号、配置往返、`probe()`）
+- [ ] GUI 启动：标题含 v1.0.5、浅色主题、三卡片；「⚙ 设置」字体/缩放实时预览，**保存后重启仍保持**
 - [ ] 工具 1：模型选择、导入、自动标注、质检、一键优化、增强预览/运行、导出 train/val+yaml、发送到训练、导出标注视频（按可用素材尽量覆盖）
 - [ ] 工具 2：浏览数据集、自动/手动、建议与一键修复、少 epoch 冒烟训练、停止、联动回图片工具、`best.pt` 可找到
 - [ ] 工具 3：模型 A/B、选图/视频、运行对比、差异图与分析报告、导出 HTML/文本/PNG
@@ -342,6 +342,13 @@ python main.py
 - 默认 `yolov8n.pt` 为 COCO 类别；自定义业务类别需先自训再标注/对比。
 
 ### 更新日志
+
+#### v1.0.5
+
+- 新增「标注审核」页签：AI 预标注后人工删错框、改类别、批量清理低置信度框。
+- 新增 `core/annotation_review.py`：加载/保存 YOLO 标注、画布预览叠加、类别映射。
+- 导出 train/val 时自动剥离审核用的置信度第 6 列，保证训练标签为标准 5 列。
+- 冒烟测试新增标注审核用例（加载 → 删低置信度 → 保存）。
 
 #### v1.0.4
 
