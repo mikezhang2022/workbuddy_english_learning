@@ -1,0 +1,43 @@
+# Build output
+bin/
+obj/
+artifacts/
+TestResults/
+coverage/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Secrets and production configuration
+.env
+.env.*
+!.env.example
+appsettings.Production.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.p12
+*.key
+*.pem
+
+# Databases and backups
+*.mdf
+*.ldf
+*.bak
+*.db
+*.db-shm
+*.db-wal
+
+# Runtime data
+logs/
+uploads/
+temp/
+data-protection-keys/
+
+# OS
+.DS_Store
+Thumbs.db
+
