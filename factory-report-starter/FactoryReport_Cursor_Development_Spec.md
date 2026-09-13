@@ -34,8 +34,8 @@ Cursor 必须遵守：
 3. 使用接口抽象和脱敏模拟数据开发，例如 `IMesSourceReader` 与 `FakeMesSourceReader`。
 4. 仓库中只提交 `.example` 配置、模拟数据和部署说明，不提交真实 Secret。
 5. 云端至少运行 `dotnet build` 和不依赖现场环境的单元测试。
-6. SQL Server 集成测试优先通过 CI 服务容器执行；Cursor 环境支持 Docker 时才允许本地启动开发容器。
-7. 无法运行 SQL Server 容器时，明确报告“集成测试未执行”，不能用 EF InMemory 测试冒充 SQL Server 集成测试。
+6. Oracle 集成测试优先通过 CI 服务容器执行；Cursor 环境支持 Docker 时才允许本地启动 Oracle 开发容器。【Oracle 版本待现场确认】
+7. 无法运行 Oracle 容器时，明确报告“集成测试未执行”，不能用 EF InMemory 测试冒充 Oracle 集成测试。模拟数据不得连接数据库。
 8. 现场部署、真实数据映射和数据口径核对必须作为人工交接任务保留。
 
 ---
@@ -139,8 +139,8 @@ https://report.factory.example.com/api
 | 图表 | Apache ECharts，本地打包 |
 | 摄像头扫码 | `getUserMedia`＋ZXing-js，本地打包 |
 | 身份认证 | ASP.NET Core Identity＋安全 Cookie |
-| 配置数据 | EF Core＋SQL Server |
-| 报表查询 | Dapper＋Microsoft.Data.SqlClient |
+| 配置数据 | EF Core＋Oracle（Oracle.EntityFrameworkCore）|
+| 报表查询 | Dapper＋Oracle.ManagedDataAccess（ODP.NET）|
 | 数据同步 | .NET Worker Service |
 | Excel | ClosedXML，仅 `.xlsx` |
 | CSV | CsvHelper |
@@ -150,6 +150,14 @@ https://report.factory.example.com/api
 | 部署 | Windows Server＋IIS＋Windows Service |
 
 使用当前受支持的 .NET LTS 版本。创建项目之前执行 `dotnet --info` 和 `dotnet new list`，以本机已安装的 LTS SDK 为准，不猜测模板参数。
+
+Oracle 统一口径：
+
+- 数据库使用 Oracle；禁止 SQL Server 专用代码、脚本、包与配置。
+- 驱动：Oracle.ManagedDataAccess / ODP.NET；EF Core：Oracle.EntityFrameworkCore。
+- Oracle 版本、Schema、字符集、连接方式、现场只读视图均为【待现场确认】。
+- 批量写入如需使用，采用 ODP.NET 能力（如 OracleBulkCopy / 数组绑定），不得使用 SqlBulkCopy。
+- 后续模拟数据不得连接数据库（Fake 内存/文件即可）。
 
 ---
 
@@ -175,13 +183,15 @@ tests/
 deploy/
   iis/
   windows-service/
-  sql/
+  oracle/
 
 docs/
   architecture.md
   api.md
   deployment.md
   data-dictionary.md
+  business-decisions.md
+  source-mapping-template.md
 ```
 
 依赖方向：
@@ -258,7 +268,7 @@ Factory
 ```csharp
 public enum DataSourceType
 {
-    SqlServer = 1,
+    Oracle = 1,
     ExcelUpload = 2,
     CsvUpload = 3
 }
@@ -276,8 +286,10 @@ public enum DatasetSourceType
 后台允许系统管理员维护：
 
 - 名称和编码
-- SQL Server 地址和数据库名
-- 认证模式
+- Oracle 主机 / 服务名（Service Name 或 SID）【待现场确认】
+- Schema / 用户【待现场确认】
+- 字符集【待现场确认】
+- 认证与连接方式【待现场确认】
 - 加密后的连接凭据引用
 - 连接超时
 - 查询超时
@@ -285,7 +297,7 @@ public enum DatasetSourceType
 - 测试连接
 - 最后测试结果
 
-优先使用 Windows 集成认证。无法使用时，凭据必须通过 ASP.NET Core Data Protection 加密，并保证密钥目录仅服务账号可读。日志不得输出完整连接字符串。
+认证方式【待现场确认】（数据库用户、Wallet、OS 认证等）。凭据必须通过 ASP.NET Core Data Protection 加密，并保证密钥目录仅服务账号可读。日志不得输出完整连接字符串。禁止使用 SQL Server 专用连接或驱动。
 
 数据库连接账号必须只读。同步服务只读取允许的视图或存储过程。
 
@@ -704,7 +716,7 @@ GET  /api/system/version
 
 ## 14. 数据库设计
 
-第一版使用一个 SQL Server 数据库，通过 Schema 分区：
+第一版使用一个 Oracle 数据库，通过 Schema（或等价命名空间）分区。【Oracle 版本、Schema 名称、字符集、连接方式待现场确认】分区示意：
 
 ```text
 sec  身份、权限和组织
@@ -765,16 +777,16 @@ aud.ReportQueryLog
 
 ```text
 imp.DatasetRecord
-- Id uniqueidentifier
-- DatasetVersionId uniqueidentifier
-- BusinessKey nvarchar(500)
-- FactoryId bigint null
-- WorkshopId bigint null
-- ProductionLineId bigint null
-- BusinessDate date null
-- DataJson nvarchar(max)
-- RowNumber int
-- CreatedAt datetime2
+- Id：【规划】GUID；Oracle 类型【待现场确认】（如 RAW(16) / VARCHAR2）
+- DatasetVersionId：【规划】GUID；Oracle 类型【待现场确认】
+- BusinessKey：【规划】字符串(500)；Oracle 类型【待现场确认】（如 NVARCHAR2）
+- FactoryId：【规划】整数可空；Oracle 类型【待现场确认】（如 NUMBER）
+- WorkshopId：【规划】整数可空；Oracle 类型【待现场确认】
+- ProductionLineId：【规划】整数可空；Oracle 类型【待现场确认】
+- BusinessDate：【规划】日期可空；Oracle 类型【待现场确认】（如 DATE）
+- DataJson：【规划】大文本 JSON；Oracle 类型【待现场确认】（如 CLOB）
+- RowNumber：【规划】整数；Oracle 类型【待现场确认】
+- CreatedAt：【规划】UTC 时间戳；Oracle 类型【待现场确认】（如 TIMESTAMP WITH TIME ZONE）
 ```
 
 索引：
@@ -786,7 +798,7 @@ imp.DatasetRecord
 
 ### 14.3 并发控制
 
-配置表增加 `rowversion`。发布报表、发布数据版本和修改权限时使用乐观并发，冲突时提示用户刷新，而不是静默覆盖。
+配置表增加乐观并发令牌（规划为 Version / RowVersion 字段；Oracle 具体类型与实现【待现场确认】，例如 NUMBER 版本列）。发布报表、发布数据版本和修改权限时使用乐观并发，冲突时提示用户刷新，而不是静默覆盖。
 
 ---
 
@@ -874,8 +886,8 @@ Serilog 输出：
 
 ### 17.3 备份
 
-- SQL Server 每日完整备份。
-- 按需要增加日志备份。
+- Oracle 每日完整备份（RMAN 或现场既定策略）【待现场确认】。
+- 按需要增加归档日志 / 增量备份【待现场确认】。
 - Data Protection 密钥目录纳入备份。
 - 已发布 Excel 原文件和版本元数据纳入备份。
 - 至少执行一次恢复演练，并记录恢复步骤。
@@ -951,16 +963,19 @@ Serilog 输出：
 
 ### 阶段 0：业务数据字典
 
-目标：先确认数据口径，不写业务页面。
+目标：先确认数据口径，不写业务页面、不安装依赖、不部署、不连接 Oracle/MES。
 
 产出：
 
-- `docs/data-dictionary.md`
+- `docs/data-dictionary.md`（字段名、类型、含义、来源为规划口径；Oracle 类型映射【待现场确认】）
+- `docs/business-decisions.md`（区分：已确认产品规则 / Fake 测试临时口径 / 必须现场确认的 Oracle·MES 映射项）
+- `docs/source-mapping-template.md`（MES/ERP → 报表字段映射模板，全部留空待现场确认）
 - 三张基础报表的字段、公式、来源、筛选和权限字段
 - Excel 生产计划模板的字段定义
 - 夜班跨天、返工、补录和冲销规则
+- 全库文档统一为 Oracle 方案（ODP.NET + Oracle.EntityFrameworkCore）
 
-验收：每个指标都能追溯到明确的数据来源和计算公式。信息不足时生成待确认清单，不自行发明口径。
+验收：每个指标都能追溯到明确的数据来源和计算公式。信息不足时生成待确认清单，不自行发明口径。本阶段不执行构建与测试。
 
 ### 阶段 1：解决方案骨架
 
@@ -992,7 +1007,7 @@ Serilog 输出：
 
 ### 阶段 3：数据源与同步
 
-目标：注册 SQL Server 数据源和第一个生产数据集。
+目标：注册 Oracle 数据源和第一个生产数据集。
 
 要求：
 
@@ -1115,7 +1130,7 @@ Serilog 输出：
 
 以下内容不能由 Cursor 猜测：
 
-- MES 数据库类型和版本
+- MES / 报表 Oracle 版本与部署形态【待现场确认】
 - MES 可用只读视图或表
 - 工单、产品、车间和产线主键
 - 生产日期与自然日期的关系
@@ -1126,7 +1141,7 @@ Serilog 输出：
 - Excel 生产计划的唯一键和覆盖范围
 - 组织和角色权限矩阵
 - 工厂域名、证书和内部 DNS 条件
-- 服务器操作系统和 SQL Server 版本
+- 服务器操作系统和 Oracle 版本【待现场确认】
 - 数据保留、审计和备份周期
 
 先确认上述内容，再接入真实 MES。开发环境只能使用脱敏样例数据。
@@ -1140,7 +1155,7 @@ Serilog 输出：
 | 环境 | 位置 | 数据 | 用途 |
 |---|---|---|---|
 | Cursor Cloud | 云端 | 脱敏 JSON/CSV 模拟数据 | 编码、构建、单元测试 |
-| CI | 云端流水线 | 临时 SQL Server 测试库 | 数据库迁移和集成测试 |
+| CI | 云端流水线 | 临时 Oracle 测试库【版本待现场确认】 | 数据库迁移和集成测试 |
 | Factory Test | 工厂局域网 | 脱敏或测试库 | 接口、证书、网络和数据映射验证 |
 | Production | 工厂局域网 | 正式报表库＋MES 只读源 | 正式运行 |
 
@@ -1160,8 +1175,8 @@ public interface IMesSourceReader
 实现：
 
 ```text
-FakeMesSourceReader       云端开发和演示
-SqlServerMesSourceReader 工厂测试和生产
+FakeMesSourceReader     云端开发和演示（内存/文件，不连库）
+OracleMesSourceReader    工厂测试和生产（ODP.NET）
 ```
 
 通过配置选择实现：
@@ -1174,7 +1189,7 @@ SqlServerMesSourceReader 工厂测试和生产
 }
 ```
 
-生产配置使用 `SqlServer`，但连接凭据通过现场 Secret 或受保护配置注入，不写进 JSON。
+生产配置使用 `Oracle`，但连接凭据通过现场 Secret 或受保护配置注入，不写进 JSON。
 
 同样为文件存储、当前时间和后台任务建立可替换抽象：
 
@@ -1218,11 +1233,11 @@ tests/Fixtures/
 
 优先顺序：
 
-1. Cursor Cloud 支持 Docker：使用 `docker-compose.dev.yml` 启动 SQL Server 测试容器。
-2. Cursor Cloud 不支持 Docker：运行不依赖 SQL Server 的构建和单元测试，把数据库集成测试交给 CI。
-3. CI 使用临时 SQL Server 服务容器，运行 EF Core Migration 和集成测试。
+1. Cursor Cloud 支持 Docker：使用 `docker-compose.dev.yml` 启动 Oracle 测试容器（镜像与版本【待现场确认】）。
+2. Cursor Cloud 不支持 Docker：运行不依赖 Oracle 的构建和单元测试，把数据库集成测试交给 CI；Fake 模拟不得连接数据库。
+3. CI 使用临时 Oracle 服务容器，运行 EF Core Migration 和集成测试。
 
-不使用真实 MES 数据库完成自动化测试。不因为云端无法访问 SQL Server 就把生产实现改成不兼容的数据库。
+不使用真实 MES 数据库完成自动化测试。不因为云端无法访问 Oracle 就把生产实现改成 SQL Server 或其他不兼容数据库。禁止引入 Microsoft.Data.SqlClient、SqlBulkCopy 等 SQL Server 专用组件。
 
 ### 23.5 配置文件规则
 
@@ -1270,12 +1285,12 @@ Cursor 每个可部署里程碑应生成：
 现场人员执行：
 
 1. 从 Git 仓库拉取已审核版本或取得发布包。
-2. 在工厂服务器安装 .NET Hosting Bundle、IIS 和 SQL Server 依赖。
+2. 在工厂服务器安装 .NET Hosting Bundle、IIS 和 Oracle 客户端/驱动依赖（ODP.NET 托管驱动优先；现场附加组件【待现场确认】）。
 3. 配置内部 DNS 和 HTTPS 证书。
 4. 创建本地报表数据库并运行 Migration。
 5. 通过现场 Secret 注入数据库连接信息。
 6. 创建 MES 只读账号或只读视图。
-7. 将 `MesSource.Provider` 从 `Fake` 切换为 `SqlServer`。
+7. 将 `MesSource.Provider` 从 `Fake` 切换为 `Oracle`。
 8. 完成字段映射和数据口径配置。
 9. 先连接 MES 测试库或受控只读范围。
 10. 对生产日报、工单进度和质量统计逐项核对。
@@ -1289,7 +1304,7 @@ Cursor 可以声明完成：
 - 功能代码已实现。
 - 构建成功。
 - 单元测试成功。
-- CI 中 SQL Server 集成测试成功。
+- CI 中 Oracle 集成测试成功。
 - 发布包和部署文档已生成。
 
 Cursor 不可以在没有现场证据时声明完成：

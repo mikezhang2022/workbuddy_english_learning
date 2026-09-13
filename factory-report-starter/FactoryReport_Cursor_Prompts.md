@@ -1,7 +1,7 @@
 # 工厂移动报表平台 Cursor Cloud 分阶段提示词
 
 配套规格：`FactoryReport_Cursor_Development_Spec.md`  
-使用方式：将配套规格和本文件都放入 Cursor 可以访问的 Git 仓库根目录，按照编号逐条发送。每条完成、检查结果并提交代码后，再发送下一条。  
+项目根目录：`factory-report-starter/`。使用方式：在该目录内阅读规格与本文件，按照编号逐条发送。每条完成、检查结果并提交代码后，再发送下一条。数据库统一为 Oracle（Oracle.ManagedDataAccess / ODP.NET + Oracle.EntityFrameworkCore）；禁止 SQL Server 专用方案。  
 
 ## 使用原则
 
@@ -18,7 +18,7 @@
 ## Prompt 00：仓库检查与执行计划
 
 ```text
-你正在参与“工厂移动报表平台”项目。请先完整阅读仓库根目录中的：
+你正在参与“工厂移动报表平台”项目。项目根目录为 factory-report-starter/。请先完整阅读该目录中的：
 
 - FactoryReport_Cursor_Development_Spec.md
 - FactoryReport_Cursor_Prompts.md
@@ -37,7 +37,7 @@
 3. 与开发规格冲突或不明确的地方。
 4. 按依赖顺序排列的开发阶段。
 5. 阶段 0 需要我提供或确认的信息。
-6. 当前云端环境的 .NET SDK、Node、Docker 和 SQL Server 测试能力。
+6. 当前云端环境的 .NET SDK、Node、Docker 和 Oracle 测试能力（模拟数据不得连库；Oracle 版本【待现场确认】）。
 7. 建议的首个代码变更范围。
 
 不要开始创建完整项目，不要安装无关依赖，不要部署。
@@ -52,13 +52,15 @@
 ```text
 请严格按照 FactoryReport_Cursor_Development_Spec.md 执行“阶段 0：业务数据字典”。
 
-本阶段不要编写业务代码，不要猜测真实 MES 表名和字段名。
+本阶段不要编写业务代码，不要安装依赖，不要部署，不要连接 Oracle/MES，不要猜测真实 MES 表名和字段名。模拟数据口径仅可作为 Fake 临时规则记录。
 
-请创建或更新：
+请创建或更新（Oracle 口径；字段类型为规划口径，Oracle 类型映射【待现场确认】）：
 
 - docs/data-dictionary.md
 - docs/business-decisions.md
 - docs/source-mapping-template.md
+
+business-decisions.md 必须明确区分三类：①已确认的产品规则；②Fake 测试临时口径（仅用于模拟数据/演示）；③必须现场确认的 Oracle/MES 映射项。
 
 data-dictionary.md 至少覆盖：
 
@@ -174,7 +176,7 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 ```text
 请根据规格中的数据库设计，实现第一版配置数据库模型和 EF Core Migration。暂时不实现页面。
 
-使用 SQL Server，Schema 至少包括：sec、cfg、imp、etl、rpt、aud。
+使用 Oracle（Oracle.EntityFrameworkCore + ODP.NET），Schema（或等价用户/命名空间）至少包括：sec、cfg、imp、etl、rpt、aud。【Oracle 版本、Schema 名称、字符集、连接方式待现场确认】。禁止 SQL Server 专用类型、驱动与脚本。
 
 实现以下核心实体及关系：
 
@@ -205,16 +207,16 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 要求：
 
 1. 复用 ASP.NET Core Identity 标准用户和角色表，不自己实现密码体系。
-2. 配置表使用 rowversion 进行乐观并发。
+2. 配置表使用乐观并发令牌（规划 Version/RowVersion；Oracle 具体类型【待现场确认】）。
 3. 所有时间字段使用 UTC DateTimeOffset 或明确的 UTC DateTime。
-4. 业务生产日期使用 DateOnly/SQL date，不与创建时间混淆。
+4. 业务生产日期使用 DateOnly / Oracle DATE（类型映射【待现场确认】），不与创建时间混淆。
 5. DatasetRecord 抽取 FactoryId、WorkshopId、ProductionLineId、BusinessDate 和 BusinessKey，并保存 DataJson。
 6. 增加规格要求的唯一索引和常用查询索引。
 7. 删除使用软删除或状态字段；已发布版本不可原地修改。
 8. 创建首个 Migration 和可重复执行的数据库初始化说明。
 9. 不连接真实数据库。
 
-为关键实体约束增加测试。如果 Cursor Cloud 支持 SQL Server 容器，运行迁移集成测试；否则只运行构建和单元测试，并明确列出未执行的 SQL Server 测试。
+为关键实体约束增加测试。如果 Cursor Cloud 支持 Oracle 容器，运行迁移集成测试；否则只运行构建和单元测试，并明确列出未执行的 Oracle 测试。Fake/模拟不得连接数据库。
 ```
 
 ---
@@ -332,16 +334,16 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 ## Prompt 09：数据源管理和凭据保护
 
 ```text
-请实现 SQL Server 数据源管理，只供 SystemAdmin 使用。
+请实现 Oracle 数据源管理，只供 SystemAdmin 使用。
 
 要求：
 
 1. 实现数据源列表、新增、编辑、停用和测试连接。
-2. 优先支持 Windows 集成认证；SQL 账号模式只保存加密后的凭据引用。
+2. 认证与连接方式【待现场确认】（数据库用户、Wallet、OS 认证等）；账号模式只保存加密后的凭据引用。
 3. 使用 ASP.NET Core Data Protection 保护凭据，并说明密钥持久化与 ACL 要求。
 4. API 和日志绝不返回完整连接字符串或密码。
 5. 测试连接设置短超时并取消长时间阻塞。
-6. 仅支持 SQL Server，不提前抽象未使用的数据库实现。
+6. 仅支持 Oracle（Oracle.ManagedDataAccess / ODP.NET），不提前抽象未使用的数据库实现；禁止引入 SQL Server 驱动或 SqlBulkCopy。
 7. 数据源必须声明用途和只读要求。
 8. 禁止 UI 输入并执行任意 SQL。
 9. 增加连接测试审计。
@@ -355,7 +357,7 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 ## Prompt 10：MES 同步 Worker
 
 ```text
-请实现第一版同步 Worker，先基于 FakeMesSourceReader 完成闭环，同时保留 SqlServerMesSourceReader 接口位置。
+请实现第一版同步 Worker，先基于 FakeMesSourceReader（内存/文件，不连库）完成闭环，同时保留 OracleMesSourceReader 接口位置。
 
 要求：
 
@@ -374,7 +376,7 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 
 测试覆盖：幂等、重复运行、同步失败、Checkpoint、不完整批次、取消和并发触发。
 
-如果 SQL Server 容器可用，增加真实 SQL Server 的写入集成测试；否则明确未执行。不要接入真实 MES。
+如果 Oracle 容器可用，增加真实 Oracle 的写入集成测试；否则明确未执行。不要接入真实 MES。禁止使用 SqlBulkCopy；批量写入采用 ODP.NET 能力（如 OracleBulkCopy / 数组绑定）【待现场确认】。
 ```
 
 ---
@@ -466,7 +468,7 @@ source-mapping-template.md 提供可供现场填写的 MES 字段映射表。
 - 发布生成不可变版本。
 - 支持停用和回退。
 - 普通管理员不能输入 SQL。
-- 并发修改使用 rowversion，冲突时提示刷新。
+- 并发修改使用乐观并发令牌（Oracle 类型【待现场确认】），冲突时提示刷新。
 - 发布后 MobilePwa 无需重新构建即可看到新报表。
 - 每次发布和回退写操作审计。
 
@@ -703,7 +705,7 @@ Cursor Cloud 无法替代手机实机测试。完成后生成 docs/scanner-test-
 要求：
 
 1. 运行全部单元测试。
-2. SQL Server 容器可用时运行全部集成测试；不可用时准备 CI 工作流并明确未执行项。
+2. Oracle 容器可用时运行全部集成测试；不可用时准备 CI 工作流并明确未执行项。
 3. 增加测试覆盖：
    - 401/403
    - 数据范围越权
@@ -737,7 +739,7 @@ CI 至少包含：
 2. Format 或代码风格检查
 3. Build（Release）
 4. Unit Tests
-5. SQL Server 服务容器
+5. Oracle 服务容器【版本待现场确认】
 6. 应用 Migration
 7. Integration Tests
 8. MobilePwa 和 AdminWeb 发布构建
@@ -777,13 +779,13 @@ CI 至少包含：
 
 1. Windows Server 和 IIS 前置条件。
 2. .NET Hosting Bundle。
-3. SQL Server 数据库创建和 Migration。
+3. Oracle 数据库创建和 Migration（Schema/字符集【待现场确认】）。
 4. 同域路径 `/mobile`、`/admin`、`/api`。
 5. 内部 DNS 和 HTTPS 证书。
 6. Data Protection 密钥目录及权限。
 7. SyncWorker Windows Service 安装、账号和恢复策略。
 8. 现场 Secret 注入。
-9. 从 FakeMesSourceReader 切换到 SqlServerMesSourceReader。
+9. 从 FakeMesSourceReader 切换到 OracleMesSourceReader。
 10. 日志目录和 ACL。
 11. 数据库、Data Protection 密钥和已发布导入文件备份。
 12. 回滚应用版本和数据库注意事项。
@@ -804,7 +806,7 @@ CI 至少包含：
 
 - docs/mes-integration-guide.md
 - docs/mes-field-mapping.xlsx 或等价的可填写映射文件（若仓库流程不适合生成 xlsx，则生成结构化 CSV/Markdown 模板并说明）
-- SqlServerMesSourceReader 的实现骨架和契约测试
+- OracleMesSourceReader 的实现骨架和契约测试（ODP.NET；不得使用 SQL Server 驱动）
 - 示例只读视图定义，使用虚构表名并明确标记为示例
 - 数据口径核对脚本模板
 
