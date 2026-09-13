@@ -1,0 +1,6 @@
+@FactoryReport.Api_HostAddress = http://localhost:5280
+
+GET {{FactoryReport.Api_HostAddress}}/health
+Accept: application/json
+
+###

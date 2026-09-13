@@ -4,6 +4,15 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
+## 当前状态（阶段 1）
+
+已创建解决方案骨架：`FactoryReport.sln`（Blazor WASM PWA + API + Admin + Worker + Domain/Application/Infrastructure + 测试）。
+
+- 默认 **Fake 模式**（内存数据，不连接任何数据库）。
+- 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
+- Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
+- Worker 为空壳 `BackgroundService`，不读取 MES/Oracle。
+
 ## 数据库口径（Oracle）
 
 - 本地报表库与 MES/ERP 只读源均按 **Oracle** 方案设计与实现。
@@ -17,15 +26,48 @@
 - `FactoryReport_Cursor_Development_Spec.md`：完整产品与技术规格。
 - `FactoryReport_Cursor_Prompts.md`：Cursor Cloud 分阶段提示词。
 - `AGENTS.md`：所有代码代理必须遵守的项目规则。
+- `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
 - `docs/data-dictionary.md`：数据字典（规划口径）。
 - `docs/business-decisions.md`：业务决策记录（已确认 / Fake 临时 / 待现场确认）。
 - `docs/source-mapping-template.md`：源系统映射模板（待现场填写）。
+
+## 本地构建与测试
+
+在本目录 `factory-report-starter/` 下执行（需已安装 .NET 10 LTS SDK）：
+
+```bash
+dotnet restore FactoryReport.sln
+dotnet build FactoryReport.sln --no-restore
+dotnet test FactoryReport.sln --no-build
+```
+
+或一步执行：
+
+```bash
+dotnet restore FactoryReport.sln
+dotnet build FactoryReport.sln
+dotnet test tests/FactoryReport.UnitTests/FactoryReport.UnitTests.csproj
+dotnet test tests/FactoryReport.IntegrationTests/FactoryReport.IntegrationTests.csproj
+```
+
+常用启动（阶段 1 空壳）：
+
+```bash
+dotnet run --project src/FactoryReport.Api
+dotnet run --project src/FactoryReport.Admin
+dotnet run --project src/FactoryReport.Client
+dotnet run --project src/FactoryReport.Worker
+```
+
+API 健康检查：`GET /health`（返回 JSON，含 Fake 模式标识）。
+
+配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token 或连接字符串。
 
 ## 开始方式
 
 1. 在 Cursor Cloud 中选择本仓库，工作目录固定为 `factory-report-starter/`。
 2. 要求 Cursor 完整阅读上述规格、提示词、AGENTS 与 README。
-3. 先执行 `FactoryReport_Cursor_Prompts.md` 中的 Prompt 00 / 阶段 0。
+3. 按 `FactoryReport_Cursor_Prompts.md` 分阶段推进；阶段 1 完成后进入阶段 2 前须先确认构建与测试通过。
 4. 每个阶段完成构建和测试后，再进入下一阶段（阶段 0 不写业务代码、不安装依赖、不部署）。
 
 ## 安全边界
