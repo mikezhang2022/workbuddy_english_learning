@@ -4,9 +4,11 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 12 完成）
+## 当前状态（阶段 13 完成）
 
-已实现 **移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航与各报表「即将接入」占位。报表数据页面与用户管理仍为后续阶段。
+已实现 **生产日报移动端查询页**（`/reports/production-daily`）：接入 `GET /api/v1/reports/production-daily`，按 `/me` 数据范围生成筛选选项，展示 meta / 汇总卡 / 明细，处理 401/403/离线。详见 `docs/ui-production-daily.md`。
+
+阶段 12：**移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航。其余四张报表仍为「即将接入」占位。
 
 阶段 11：**报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
 
@@ -29,7 +31,7 @@
 - Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
 - **移动 PWA**（见 `docs/mobile-pwa.md`）：Manifest + Service Worker 应用壳；不缓存 `/api`；离线提示「数据需联网获取」。
 - **Client 运行**：先启动 API，再 `dotnet run --project src/FactoryReport.Client`；`wwwroot/appsettings.json` 配置 `FactoryReportClient:ApiBaseUrl`（示例为 localhost，不含内网机密）。
-- **本阶段 Client 不包含** 具体报表数据页、用户管理 UI；**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入、MES 同步（除非另行实现）。
+- **Client 已含** 生产日报数据页；其余报表数据页与用户管理 UI 仍为后续阶段。**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入、MES 同步（除非另行实现）。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Admin 仍为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
@@ -53,6 +55,7 @@
 - `docs/authentication.md`：Cookie 登录、角色、Fake/生产边界、Oracle 账号替换点（阶段 10）。
 - `docs/authorization-and-data-scope.md`：角色与数据范围、401/403、交集规则、Fake 授权、Oracle 替换点（阶段 11）。
 - `docs/mobile-pwa.md`：PWA 登录流程、离线/缓存边界、本地运行方式（阶段 12）。
+- `docs/ui-production-daily.md`：生产日报移动端页面字段、Fake 标识、范围与离线边界（阶段 13）。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
 - `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。

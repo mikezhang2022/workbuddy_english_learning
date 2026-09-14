@@ -10,6 +10,8 @@ public interface IAuthSessionService
     Task InitializeAsync(CancellationToken cancellationToken = default);
     Task LoginAsync(string userName, string password, CancellationToken cancellationToken = default);
     Task LogoutAsync(CancellationToken cancellationToken = default);
+    /// <summary>本地清除会话（如 API 返回 401）；不调用 logout 接口。</summary>
+    void ClearLocalSession();
     event Action? SessionChanged;
 }
 
@@ -73,6 +75,11 @@ public sealed class AuthSessionService(
             }
         }
 
+        ClearLocalSession();
+    }
+
+    public void ClearLocalSession()
+    {
         CurrentUser = null;
         _csrfToken = null;
         NotifyChanged();

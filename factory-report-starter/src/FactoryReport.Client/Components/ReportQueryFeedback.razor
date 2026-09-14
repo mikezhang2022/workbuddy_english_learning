@@ -1,0 +1,42 @@
+@* 报表查询加载 / 空 / 错误状态 *@
+
+@if (IsLoading)
+{
+    <div class="report-state report-state-loading" role="status" aria-live="polite">
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+        <MudText Typo="Typo.body2">正在查询…</MudText>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" aria-live="assertive">
+        @ErrorMessage
+        @if (!string.IsNullOrWhiteSpace(CorrelationId))
+        {
+            <MudText Typo="Typo.caption" Class="mt-1">参考编号：@CorrelationId</MudText>
+        }
+    </MudAlert>
+}
+else if (ShowEmpty)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" aria-live="polite">
+        @(EmptyMessage ?? "当前筛选条件下无数据。")
+    </MudAlert>
+}
+
+@code {
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    [Parameter]
+    public string? CorrelationId { get; set; }
+
+    [Parameter]
+    public bool ShowEmpty { get; set; }
+
+    [Parameter]
+    public string? EmptyMessage { get; set; }
+}

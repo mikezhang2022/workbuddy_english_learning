@@ -101,3 +101,9 @@ dotnet run --project src/FactoryReport.Client
 - **单元测试**：ProblemDetails 解析、数据范围展示格式化（`tests/FactoryReport.UnitTests/Client/`）。
 - **集成测试**：`/api/v1/auth/csrf` 与既有 Auth API（`AuthApiTests`）。
 - **浏览器端到端**：本 Cloud 环境未配置 Playwright/Selenium 流水线；未声称 PWA 安装或真机 E2E 已通过。现场需自行验证安装、离线壳与 Cookie 同源策略。
+
+---
+
+## 7. 阶段 13：生产日报数据页
+
+已实现第一个真实可查询报表页：`/reports/production-daily`。字段、Fake 标识、范围与离线边界见 **`docs/ui-production-daily.md`**。其余四张报表仍为占位。

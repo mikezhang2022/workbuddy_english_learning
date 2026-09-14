@@ -176,3 +176,64 @@ html, body {
         font-size: 0.6rem;
     }
 }
+
+.report-filter-panel {
+    background: #fff;
+}
+
+.report-filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 0.75rem;
+}
+
+@media (min-width: 600px) {
+    .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.65rem;
+    background: #eef3f6;
+    border-radius: 4px;
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    color: #4a5a66;
+}
+
+.summary-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1f3a4d;
+}
+
+.report-row-card {
+    background: #fff;
+}
+
+.row-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.report-table {
+    background: #fff;
+}
+
+.report-state-loading {
+    padding: 0.75rem 0;
+}
+
