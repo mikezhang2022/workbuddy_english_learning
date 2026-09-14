@@ -110,4 +110,8 @@ dotnet run --project src/FactoryReport.Client
 
 ## 8. 阶段 14：工单进度数据页
 
-已实现第二个真实可查询报表页：`/reports/work-order-progress`。字段、Fake 延期规则、范围与离线边界见 **`docs/ui-work-order-progress.md`**。其余三张报表仍为占位。
+已实现第二个真实可查询报表页：`/reports/work-order-progress`。字段、Fake 延期规则、范围与离线边界见 **`docs/ui-work-order-progress.md`**。
+
+## 9. 阶段 15：质量统计数据页
+
+已实现第三个真实可查询报表页：`/reports/quality-statistics`。字段、Fake 质量口径、范围与离线边界见 **`docs/ui-quality-statistics.md`**。其余两张报表（计划达成、月度计划）仍为占位。

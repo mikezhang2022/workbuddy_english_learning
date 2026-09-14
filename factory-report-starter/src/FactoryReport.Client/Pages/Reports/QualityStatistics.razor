@@ -1,6 +1,513 @@
 @page "/reports/quality-statistics"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@implements IDisposable
+@using FactoryReport.Application.Reporting.QualityStatistics
+@using FactoryReport.Application.Security.DataScope
+@inject IAuthSessionService AuthSession
+@inject ReportsApiClient ReportsApi
+@inject IOnlineStatusService OnlineStatus
+@inject NavigationManager Navigation
 
 <PageTitle>质量统计 - 工厂报表</PageTitle>
 <h1 class="visually-hidden">质量统计</h1>
-<ReportPlaceholder Title="质量统计" />
+
+<MudText Typo="Typo.h6" GutterBottom="true">质量统计</MudText>
+
+@if (!OnlineStatus.IsOnline)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" aria-live="polite">
+        @ApiConstants.ReportOfflineMessage
+    </MudAlert>
+}
+
+<MudPaper Class="pa-3 mb-3 report-filter-panel" Outlined="true">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">筛选条件</MudText>
+
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="工厂"
+                       Value="_factoryId"
+                       ValueChanged="OnFactoryChangedAsync"
+                       Required="true"
+                       RequiredError="请选择工厂"
+                       Disabled="_loading"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var f in _factoryOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)f.Id)">@f.Label</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_scope?.IsGlobal == true)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">全局授权：须显式选择一个工厂</MudText>
+            }
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudDatePicker Label="开始日期"
+                           Date="_startDate"
+                           DateChanged="OnStartDateChanged"
+                           DateFormat="yyyy-MM-dd"
+                           Editable="true"
+                           Required="true"
+                           RequiredError="请选择开始日期"
+                           Disabled="_loading" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudDatePicker Label="结束日期"
+                           Date="_endDate"
+                           DateChanged="OnEndDateChanged"
+                           DateFormat="yyyy-MM-dd"
+                           Editable="true"
+                           Required="true"
+                           RequiredError="请选择结束日期"
+                           Disabled="_loading" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="车间（可选）"
+                       Value="_workshopId"
+                       ValueChanged="OnWorkshopChangedAsync"
+                       Clearable="true"
+                       Disabled="_loading || _factoryId is null"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var w in _workshopOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)w.Id)">@w.Label</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="产线（可选）"
+                       Value="_productionLineId"
+                       ValueChanged="OnProductionLineChangedAsync"
+                       Clearable="true"
+                       Disabled="_loading || _workshopId is null"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var line in _lineOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)line.Id)">@line.Label</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudTextField @bind-Value="_productCode"
+                          Label="产品编码（可选）"
+                          Disabled="_loading"
+                          Immediate="true" />
+        </MudItem>
+    </MudGrid>
+
+    @if (!string.IsNullOrWhiteSpace(_filterValidationError))
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_filterValidationError</MudAlert>
+    }
+
+    <div class="report-filter-actions mt-3">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_loading || !OnlineStatus.IsOnline"
+                   OnClick="QueryAsync">
+            查询
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Disabled="_loading"
+                   Class="ml-2"
+                   OnClick="ResetFilters">
+            重置
+        </MudButton>
+    </div>
+</MudPaper>
+
+<ReportQueryFeedback IsLoading="_loading"
+                     ErrorMessage="_errorMessage"
+                     CorrelationId="_errorCorrelationId"
+                     ShowEmpty="_hasQueried && _response is not null && _response.Rows.Count == 0 && string.IsNullOrEmpty(_errorMessage)"
+                     EmptyMessage="当前筛选条件下无数据。" />
+
+@if (_response is not null && string.IsNullOrEmpty(_errorMessage) && !_loading)
+{
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <MudText Typo="Typo.subtitle2">查询元数据</MudText>
+        <MudText Typo="Typo.body2">报表编码：@_response.Meta.ReportCode</MudText>
+        <MudText Typo="Typo.body2">
+            数据模式：@_response.Meta.DataAccessMode
+            @if (_response.Meta.IsFake)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1">Fake 数据</MudChip>
+            }
+        </MudText>
+        <MudText Typo="Typo.body2">
+            查询范围：工厂 @_response.Meta.Filters.FactoryId，
+            @_response.Meta.Filters.StartDate.ToString("yyyy-MM-dd")
+            ～
+            @_response.Meta.Filters.EndDate.ToString("yyyy-MM-dd")
+            @if (_response.Meta.Filters.WorkshopId is not null)
+            {
+                <span>，车间 @_response.Meta.Filters.WorkshopId</span>
+            }
+            @if (_response.Meta.Filters.ProductionLineId is not null)
+            {
+                <span>，产线 @_response.Meta.Filters.ProductionLineId</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_response.Meta.Filters.ProductCode))
+            {
+                <span>，产品 @_response.Meta.Filters.ProductCode</span>
+            }
+        </MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+            @QualityMetricsDisplay.FakeRateHint
+        </MudAlert>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @_response.Meta.QualityMetricsDisclaimer
+        </MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @QualityMetricsDisplay.QuantityColumnsHint
+        </MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @_response.Meta.YieldRateFormula
+        </MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @_response.Meta.DefectRateFormula
+        </MudText>
+    </MudPaper>
+
+    @if (_response.Rows.Count > 0)
+    {
+        var summary = QualityStatisticsDisplaySummary.FromRows(_response.Rows);
+        <MudPaper Class="pa-3 mb-3" Outlined="true">
+            <MudText Typo="Typo.subtitle2" Class="mb-1">汇总（当前返回行）</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                @ApiConstants.DisplaySummaryDisclaimer
+            </MudAlert>
+            <div class="summary-grid">
+                <div class="summary-item"><span class="summary-label">检验数</span><span class="summary-value">@FormatQty(summary.InspectionQuantity)</span></div>
+                <div class="summary-item"><span class="summary-label">良品</span><span class="summary-value">@FormatQty(summary.GoodQuantity)</span></div>
+                <div class="summary-item"><span class="summary-label">不良</span><span class="summary-value">@FormatQty(summary.DefectQuantity)</span></div>
+                <div class="summary-item"><span class="summary-label">报废</span><span class="summary-value">@FormatQty(summary.ScrapQuantity)</span></div>
+                <div class="summary-item"><span class="summary-label">返工</span><span class="summary-value">@FormatQty(summary.ReworkQuantity)</span></div>
+            </div>
+        </MudPaper>
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">明细（@_response.Rows.Count 行）</MudText>
+
+        <div class="report-rows-desktop d-none d-md-block">
+            <MudTable Items="_response.Rows" Dense="true" Hover="true" Breakpoint="Breakpoint.None" Class="report-table">
+                <HeaderContent>
+                    <MudTh>生产日</MudTh>
+                    <MudTh>工厂</MudTh>
+                    <MudTh>车间</MudTh>
+                    <MudTh>产线</MudTh>
+                    <MudTh>产品</MudTh>
+                    <MudTh>检验</MudTh>
+                    <MudTh>良品</MudTh>
+                    <MudTh>不良</MudTh>
+                    <MudTh>报废</MudTh>
+                    <MudTh>返工</MudTh>
+                    <MudTh>良率</MudTh>
+                    <MudTh>不良率</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="生产日">@context.ProductionDate.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="工厂">@context.FactoryCode</MudTd>
+                    <MudTd DataLabel="车间">@context.WorkshopCode</MudTd>
+                    <MudTd DataLabel="产线">@context.ProductionLineCode</MudTd>
+                    <MudTd DataLabel="产品">@context.ProductCode</MudTd>
+                    <MudTd DataLabel="检验">@FormatQty(context.InspectionQuantity)</MudTd>
+                    <MudTd DataLabel="良品">@FormatQty(context.GoodQuantity)</MudTd>
+                    <MudTd DataLabel="不良">@FormatQty(context.DefectQuantity)</MudTd>
+                    <MudTd DataLabel="报废">@FormatQty(context.ScrapQuantity)</MudTd>
+                    <MudTd DataLabel="返工">@FormatQty(context.ReworkQuantity)</MudTd>
+                    <MudTd DataLabel="良率">@RatioDisplayFormatter.FormatPercent(context.YieldRate)</MudTd>
+                    <MudTd DataLabel="不良率">@RatioDisplayFormatter.FormatPercent(context.DefectRate)</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </div>
+
+        <div class="report-rows-mobile d-md-none">
+            @foreach (var row in _response.Rows)
+            {
+                <MudPaper Class="pa-3 mb-2 report-row-card" Outlined="true">
+                    <MudText Typo="Typo.subtitle2">@row.ProductionDate.ToString("yyyy-MM-dd") · @row.ProductCode</MudText>
+                    <MudText Typo="Typo.caption">@row.FactoryCode / @row.WorkshopCode / @row.ProductionLineCode</MudText>
+                    <div class="row-metrics mt-2">
+                        <span>检验 @FormatQty(row.InspectionQuantity)</span>
+                        <span>良品 @FormatQty(row.GoodQuantity)</span>
+                        <span>不良 @FormatQty(row.DefectQuantity)</span>
+                        <span>报废 @FormatQty(row.ScrapQuantity)</span>
+                        <span>返工 @FormatQty(row.ReworkQuantity)</span>
+                        <span>良率 @RatioDisplayFormatter.FormatPercent(row.YieldRate)</span>
+                        <span>不良率 @RatioDisplayFormatter.FormatPercent(row.DefectRate)</span>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+}
+
+@code {
+    private DataScopeSummary? _scope;
+    private IReadOnlyList<OrgOption> _factoryOptions = [];
+    private IReadOnlyList<OrgOption> _workshopOptions = [];
+    private IReadOnlyList<OrgOption> _lineOptions = [];
+
+    private long? _factoryId;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private long? _workshopId;
+    private long? _productionLineId;
+    private string? _productCode;
+
+    private bool _loading;
+    private bool _hasQueried;
+    private string? _filterValidationError;
+    private string? _errorMessage;
+    private string? _errorCorrelationId;
+    private QualityStatisticsQueryResponse? _response;
+
+    protected override void OnInitialized()
+    {
+        OnlineStatus.ConnectivityChanged += OnConnectivityChanged;
+        ApplyScopeFromSession();
+    }
+
+    public void Dispose()
+    {
+        OnlineStatus.ConnectivityChanged -= OnConnectivityChanged;
+    }
+
+    private void OnConnectivityChanged() => InvokeAsync(StateHasChanged);
+
+    private void ApplyScopeFromSession()
+    {
+        _scope = AuthSession.CurrentUser?.DataScope;
+        _factoryOptions = ReportDataScopeOptions.GetFactoryOptions(_scope);
+        var auto = ReportDataScopeOptions.TryAutoSelectFactory(_scope);
+        _factoryId = auto;
+        RefreshDependentOptions();
+    }
+
+    private void RefreshDependentOptions()
+    {
+        _workshopOptions = ReportDataScopeOptions.GetWorkshopOptions(_scope, _factoryId);
+        if (_workshopId is not null && _workshopOptions.All(w => w.Id != _workshopId))
+        {
+            _workshopId = null;
+        }
+
+        if (_workshopOptions.Count == 1 && _workshopId is null
+            && _scope is not null && !_scope.IsGlobal
+            && !HasFactoryWideForSelected())
+        {
+            _workshopId = _workshopOptions[0].Id;
+        }
+
+        _lineOptions = ReportDataScopeOptions.GetProductionLineOptions(_scope, _factoryId, _workshopId);
+        if (_productionLineId is not null && _lineOptions.All(l => l.Id != _productionLineId))
+        {
+            _productionLineId = null;
+        }
+
+        if (_lineOptions.Count == 1 && _productionLineId is null
+            && _scope is not null && !_scope.IsGlobal
+            && !HasWorkshopWideForSelected())
+        {
+            _productionLineId = _lineOptions[0].Id;
+        }
+    }
+
+    private bool HasFactoryWideForSelected()
+        => _scope is not null
+           && _factoryId is not null
+           && _scope.Grants.Any(g => g.FactoryId == _factoryId && g.WorkshopId is null);
+
+    private bool HasWorkshopWideForSelected()
+        => _scope is not null
+           && _factoryId is not null
+           && _workshopId is not null
+           && (_scope.IsGlobal
+               || _scope.Grants.Any(g =>
+                   g.FactoryId == _factoryId
+                   && g.WorkshopId == _workshopId
+                   && g.ProductionLineId is null)
+               || HasFactoryWideForSelected());
+
+    private Task OnFactoryChangedAsync(long? value)
+    {
+        _factoryId = value;
+        _workshopId = null;
+        _productionLineId = null;
+        RefreshDependentOptions();
+        return Task.CompletedTask;
+    }
+
+    private Task OnWorkshopChangedAsync(long? value)
+    {
+        _workshopId = value;
+        _productionLineId = null;
+        RefreshDependentOptions();
+        return Task.CompletedTask;
+    }
+
+    private Task OnProductionLineChangedAsync(long? value)
+    {
+        _productionLineId = value;
+        return Task.CompletedTask;
+    }
+
+    private void OnStartDateChanged(DateTime? value) => _startDate = value;
+
+    private void OnEndDateChanged(DateTime? value) => _endDate = value;
+
+    private void ResetFilters()
+    {
+        _filterValidationError = null;
+        _errorMessage = null;
+        _errorCorrelationId = null;
+        _response = null;
+        _hasQueried = false;
+        _startDate = null;
+        _endDate = null;
+        _workshopId = null;
+        _productionLineId = null;
+        _productCode = null;
+        ApplyScopeFromSession();
+    }
+
+    private async Task QueryAsync()
+    {
+        _filterValidationError = null;
+        _errorMessage = null;
+        _errorCorrelationId = null;
+
+        if (!OnlineStatus.IsOnline)
+        {
+            ClearResultData();
+            _errorMessage = ApiConstants.ReportOfflineMessage;
+            _hasQueried = true;
+            return;
+        }
+
+        if (_scope is null)
+        {
+            ClearResultData();
+            _filterValidationError = "无法读取授权数据范围，请重新登录。";
+            return;
+        }
+
+        if (_factoryId is null or <= 0)
+        {
+            _filterValidationError = "请选择工厂。";
+            return;
+        }
+
+        if (!ReportDataScopeOptions.AllowsFactory(_scope, _factoryId.Value))
+        {
+            ClearResultData();
+            _filterValidationError = "所选工厂不在授权范围内。";
+            return;
+        }
+
+        if (_startDate is null || _endDate is null)
+        {
+            _filterValidationError = "请选择开始日期与结束日期。";
+            return;
+        }
+
+        var start = DateOnly.FromDateTime(_startDate.Value);
+        var end = DateOnly.FromDateTime(_endDate.Value);
+        if (start > end)
+        {
+            _filterValidationError = "开始日期不能晚于结束日期。";
+            return;
+        }
+
+        if (_workshopId is not null
+            && !ReportDataScopeOptions.AllowsWorkshop(_scope, _factoryId.Value, _workshopId.Value))
+        {
+            ClearResultData();
+            _filterValidationError = "所选车间不在授权范围内。";
+            return;
+        }
+
+        if (_productionLineId is not null)
+        {
+            if (_workshopId is null
+                || !ReportDataScopeOptions.AllowsProductionLine(
+                    _scope, _factoryId.Value, _workshopId.Value, _productionLineId.Value))
+            {
+                ClearResultData();
+                _filterValidationError = "所选产线不在授权范围内。";
+                return;
+            }
+        }
+
+        _loading = true;
+        ClearResultData();
+        try
+        {
+            var query = new QualityStatisticsClientQuery
+            {
+                FactoryId = _factoryId.Value,
+                StartDate = start,
+                EndDate = end,
+                WorkshopId = _workshopId,
+                ProductionLineId = _productionLineId,
+                ProductCode = string.IsNullOrWhiteSpace(_productCode) ? null : _productCode.Trim()
+            };
+
+            _response = await ReportsApi.GetQualityStatisticsAsync(query);
+            _hasQueried = true;
+        }
+        catch (ApiRequestException ex)
+        {
+            ClearResultData();
+            _hasQueried = true;
+            _errorCorrelationId = ex.Problem.CorrelationId;
+
+            if (ex.IsUnauthorized)
+            {
+                AuthSession.ClearLocalSession();
+                var returnUrl = Uri.EscapeDataString(
+                    Navigation.ToBaseRelativePath(Navigation.Uri));
+                Navigation.NavigateTo($"login?returnUrl={returnUrl}", replace: true);
+                return;
+            }
+
+            if (ex.IsForbidden)
+            {
+                _errorMessage = ApiConstants.ForbiddenScopeMessage;
+                return;
+            }
+
+            if (ex.Problem.Status is null)
+            {
+                _errorMessage = ApiConstants.ReportOfflineMessage;
+                return;
+            }
+
+            _errorMessage = string.IsNullOrWhiteSpace(ex.Problem.Detail)
+                ? "查询失败，请稍后重试。"
+                : ex.Problem.Detail;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearResultData()
+    {
+        _response = null;
+    }
+
+    private static string FormatQty(decimal value)
+        => value.ToString("0.##");
+}
