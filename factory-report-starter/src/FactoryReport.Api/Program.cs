@@ -44,10 +44,11 @@ if (!app.Environment.IsEnvironment("Testing"))
     app.UseHttpsRedirection();
 }
 
-// 只读报表 API（阶段 5/6/7）：生产日报、工单进度、质量统计。无写入端点。
+// 只读报表 API（阶段 5/6/7/8）：生产日报、工单进度、质量统计、计划达成。无写入端点。
 app.MapProductionDailyReportEndpoints();
 app.MapWorkOrderProgressReportEndpoints();
 app.MapQualityStatisticsReportEndpoints();
+app.MapProductionPlanAchievementReportEndpoints();
 
 app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataStore store) =>
 {

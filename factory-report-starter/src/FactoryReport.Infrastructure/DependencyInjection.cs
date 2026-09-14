@@ -2,6 +2,7 @@ using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Configuration;
 using FactoryReport.Application.DataAccess;
 using FactoryReport.Application.Reporting.ProductionDaily;
+using FactoryReport.Application.Reporting.ProductionPlanAchievement;
 using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
 using FactoryReport.Infrastructure.Fake;
@@ -32,7 +33,7 @@ public static class DependencyInjection
 
         var configuredMode = configuration.GetValue<string>(DataModeConfigKey) ?? nameof(DataAccessMode.Fake);
 
-        // 阶段 4/5/6/7：无论配置为何，一律注册 Fake 实现，禁止真实 Oracle / MES 连接。
+        // 阶段 4/5/6/7/8：无论配置为何，一律注册 Fake 实现，禁止真实 Oracle / MES 连接。
         services.AddSingleton<IDataAccessModeProvider, FakeDataAccessModeProvider>();
         services.AddSingleton<IPlaceholderDataStore, FakePlaceholderDataStore>();
         services.AddSingleton<IUtcClock, SystemUtcClock>();
@@ -50,6 +51,7 @@ public static class DependencyInjection
         services.AddSingleton<IProductionDailyReportService, ProductionDailyReportService>();
         services.AddSingleton<IWorkOrderProgressReportService, WorkOrderProgressReportService>();
         services.AddSingleton<IQualityStatisticsReportService, QualityStatisticsReportService>();
+        services.AddSingleton<IProductionPlanAchievementReportService, ProductionPlanAchievementReportService>();
 
         // 【待现场确认】未来 Oracle 替换点：
         // 1. 在 Persistence/Oracle/ 实现上述 I*ReadRepository 接口（DbContext / ODP.NET）。

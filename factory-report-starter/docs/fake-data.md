@@ -107,8 +107,14 @@ Application（`FactoryReport.Application/DataAccess/`）：
 | `IProductionDailyReportService` | 生产日报（`production_daily`）只读聚合；见 `docs/api-production-daily.md` |
 | `IWorkOrderProgressReportService` | 工单进度（`work_order_progress`）只读查询；见 `docs/api-work-order-progress.md` |
 | `IQualityStatisticsReportService` | 质量统计（`quality_statistics`）只读聚合；见 `docs/api-quality-statistics.md` |
+| `IProductionPlanAchievementReportService` | 生产计划达成（`production_plan_achievement`）只读组合查询；见 `docs/api-production-plan-achievement.md` |
 
 筛选类型：`OrganizationScopeFilter`、`DateRangeFilter`。
+
+### 计划达成场景（阶段 8）
+
+夹具已覆盖四边界（§2 a–d），本阶段**未新增**夹具行；关联键与状态见领域 `PlanAchievementResult`。  
+API 读取日计划 + 生产事实后按键组合；**不得**用月计划平均推算日计划。
 
 ---
 

@@ -137,4 +137,5 @@ Application 层：`StableReportCodes`、`PlanAchievementEvaluator`、`IUtcClock`
 阶段 5 已基于 Fake 实现生产日报查询 API（见 `docs/api-production-daily.md`）。  
 阶段 6 已基于 Fake 实现工单进度查询 API（见 `docs/api-work-order-progress.md`）。  
 阶段 7 已基于 Fake 实现质量统计查询 API（见 `docs/api-quality-statistics.md`）。  
-下一步建议：在 Fake 数据上实现计划达成只读 API，或进入权限与组织范围强制；Oracle 映射与迁移仍为后续独立阶段。
+阶段 8 已基于 Fake 实现生产计划达成查询 API（见 `docs/api-production-plan-achievement.md`）。  
+下一步建议：进入权限与组织范围强制，或报表页面；Oracle 映射与迁移仍为后续独立阶段。
