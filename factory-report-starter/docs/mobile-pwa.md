@@ -118,4 +118,8 @@ dotnet run --project src/FactoryReport.Client
 
 ## 10. 阶段 16：计划达成数据页
 
-已实现第四个真实可查询报表页：`/reports/production-plan-achievement`。字段、四种 PlanStatus 中文文案、范围与离线边界见 **`docs/ui-production-plan-achievement.md`**。月度计划仍为占位。
+已实现第四个真实可查询报表页：`/reports/production-plan-achievement`。字段、四种 PlanStatus 中文文案、范围与离线边界见 **`docs/ui-production-plan-achievement.md`**。
+
+## 11. 阶段 17：月度生产计划数据页
+
+已实现第五个（最后一张）真实可查询报表页：`/reports/monthly-production-plan`。字段、计划版本与日行展示规则、Fake 版本行为、范围与离线边界见 **`docs/ui-monthly-production-plan.md`**。五张报表页面全部完成。

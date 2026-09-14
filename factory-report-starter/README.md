@@ -4,9 +4,13 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 16 完成）
+## 当前状态（阶段 17 完成）
 
-已实现 **计划达成移动端查询页**（`/reports/production-plan-achievement`）：接入 `GET /api/v1/reports/production-plan-achievement`，按 `/me` 数据范围生成筛选选项，展示 meta / 汇总 / 明细（计划·实际数量 + 四种 PlanStatus 中文文案），处理 401/403/离线。详见 `docs/ui-production-plan-achievement.md`。
+已实现 **月度生产计划移动端查询页**（`/reports/monthly-production-plan`）：接入 `GET /api/v1/reports/monthly-production-plan`，按 `/me` 数据范围筛选，必填 `PlanMonth`（yyyy-MM），展示 meta / 激活版本 / 原始日计划行（禁止前端月均摊），处理 401/403/离线。详见 `docs/ui-monthly-production-plan.md`。
+
+**五张报表移动端页面全部完成**（生产日报、工单进度、质量统计、计划达成、月度生产计划）。
+
+阶段 16：**计划达成移动端查询页**（`/reports/production-plan-achievement`）。详见 `docs/ui-production-plan-achievement.md`。
 
 阶段 15：**质量统计移动端查询页**（`/reports/quality-statistics`）。详见 `docs/ui-quality-statistics.md`。
 
@@ -14,7 +18,7 @@
 
 阶段 13：**生产日报移动端查询页**（`/reports/production-daily`）。详见 `docs/ui-production-daily.md`。
 
-阶段 12：**移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航。月度计划仍为「即将接入」占位。
+阶段 12：**移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航。
 
 阶段 11：**报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
 
@@ -37,7 +41,7 @@
 - Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
 - **移动 PWA**（见 `docs/mobile-pwa.md`）：Manifest + Service Worker 应用壳；不缓存 `/api`；离线提示「数据需联网获取」。
 - **Client 运行**：先启动 API，再 `dotnet run --project src/FactoryReport.Client`；`wwwroot/appsettings.json` 配置 `FactoryReportClient:ApiBaseUrl`（示例为 localhost，不含内网机密）。
-- **Client 已含** 生产日报、工单进度、质量统计与计划达成数据页；月度计划与用户管理 UI 仍为后续阶段。**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入、MES 同步（除非另行实现）。
+- **Client 已含** 五张报表数据页（生产日报、工单进度、质量统计、计划达成、月度生产计划）；用户管理 UI 仍为后续阶段。**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入/发布/激活、MES 同步（除非另行实现）。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Admin 仍为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
@@ -65,6 +69,7 @@
 - `docs/ui-work-order-progress.md`：工单进度移动端页面字段、Fake 延期规则、范围与离线边界（阶段 14）。
 - `docs/ui-quality-statistics.md`：质量统计移动端页面字段、Fake 质量口径、范围与离线边界（阶段 15）。
 - `docs/ui-production-plan-achievement.md`：计划达成移动端页面字段、四种 PlanStatus 中文文案、范围与离线边界（阶段 16）。
+- `docs/ui-monthly-production-plan.md`：月度生产计划移动端页面字段、计划版本与日行展示规则、Fake 版本行为、范围与离线边界（阶段 17）。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
 - `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。
