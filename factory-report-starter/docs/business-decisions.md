@@ -56,7 +56,8 @@
 ### 2.2 产量与质量
 
 - [x] **Fake**：`actualQuantity` = 报工合计，演示数据中返工另字段展示且默认不计入实际。**正式是否计入【见 ③】。**
-- [x] **Fake**：`yieldRate` = goodQuantity / (goodQuantity + defectQuantity)；分母为 0 时显示「—」。
+- [x] **Fake（生产日报 API，阶段 5）**：`yieldRate` = `goodQuantity / inspectionQuantity`；`inspectionQuantity` 为 0 时返回 `null`。响应元数据标注『Fake 测试口径，现场 MES 接入前须确认』。**不代表现场规则；正式分子分母【见 ③】。**
+- [x] **Fake（历史演示备注）**：曾用 `goodQuantity / (goodQuantity + defectQuantity)` 作 UI 演示公式；**生产日报查询以阶段 5 API 口径为准**。
 - [x] **Fake**：`defectRate` = defectQuantity / inspectedQuantity；检验为 0 时显示「—」。
 - [x] **Fake**：冲销以负数量行出现在 Fixtures；同步逻辑应能消化，但字段映射非正式。
 

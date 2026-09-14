@@ -4,18 +4,19 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 4 完成）
+## 当前状态（阶段 5 完成）
 
-已实现可替换的 **Fake 内存数据访问层**与确定性夹具（组织 / 产品 / 工单 / 生产事实 / 日计划 / 导入批次），供后续报表引擎使用；并保留领域模型与运维基础。
+已实现稳定报表编码 **`production_daily`** 的只读查询 API 与聚合逻辑（基于 Fake 内存数据层）；此前阶段保留领域模型、Fake 夹具与运维基础。
 
 - 默认 **Fake 模式**（进程内确定性夹具，不连接任何数据库）。
-- Application 定义只读仓储抽象 + `IReportDataQueryService`；Infrastructure 提供 Fake 实现与 DI 注册。
-- 夹具覆盖计划/实际边界场景与工厂数据隔离；说明见 `docs/fake-data.md`。
-- **本阶段不包含** Oracle 表结构、EF Migration、DDL、Schema、报表 API/页面、认证、MES 同步或 Excel。
+- **API**：`GET /api/v1/reports/production-daily`（只读；无写入端点）。说明见 `docs/api-production-daily.md`。
+- Application：`IProductionDailyReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读数，API 不直接依赖 Fake 实现类。
+- Fake 良率临时口径：`YieldRate = GoodQuantity / InspectionQuantity`（分母 0 → `null`），响应元数据标注『Fake 测试口径，现场 MES 接入前须确认』。
+- **本阶段不包含** 报表页面、登录/权限、MES 同步、Excel、Oracle Migration/DDL、SQL Server。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
-- 领域说明见 `docs/domain-model.md`。
+- 领域说明见 `docs/domain-model.md`；夹具说明见 `docs/fake-data.md`。
 
 ## 数据库口径（Oracle）
 
@@ -34,6 +35,7 @@
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4）。
+- `docs/api-production-daily.md`：生产日报查询 API（阶段 5；参数、响应、Fake 口径与边界）。
 - `docs/data-dictionary.md`：数据字典（规划口径）。
 - `docs/business-decisions.md`：业务决策记录（已确认 / Fake 临时 / 待现场确认）。
 - `docs/source-mapping-template.md`：源系统映射模板（待现场填写）。
@@ -76,6 +78,12 @@ curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready 
 ```
 
 期望：`/health/ready` 在 Fake 模式下返回 Healthy，且过程中不连接 Oracle/MES。
+
+生产日报示例（Fake 夹具日期）：
+
+```bash
+curl -s "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+```
 
 配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token、连接字符串或 Oracle Wallet。
 

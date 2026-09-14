@@ -1,20 +1,20 @@
-# 架构说明（阶段 4）
+# 架构说明（阶段 5）
 
 ## 目录职责
 
 | 路径 | 职责 |
 |------|------|
 | `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`。只依赖 Domain。 |
-| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、Options 校验、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`。 |
-| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志。 |
+| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、**生产日报查询服务**（`Reporting/ProductionDaily`）。只依赖 Domain。 |
+| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、Options 校验、UTC 时钟、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`。 |
+| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、**只读报表端点** `GET /api/v1/reports/production-daily`。 |
 | `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |
 | `src/FactoryReport.Admin` | Blazor 管理后台空壳。依赖 Application，不依赖 Client。 |
 | `src/FactoryReport.Worker` | 后台 Worker：Fake 模式下启动/停止/周期心跳日志；不连 Oracle/MES。 |
 | `tests/FactoryReport.UnitTests` | 单元测试。 |
 | `tests/FactoryReport.IntegrationTests` | 集成测试（云端以 Fake 为准；真实 Oracle 测试【待现场确认】/CI）。 |
 | `tests/Fixtures` | 虚构/脱敏测试夹具。 |
-| `docs/` | 规格与架构文档（含 `operations.md` 运维可观测性）。 |
+| `docs/` | 规格与架构文档（含 `operations.md`、`api-production-daily.md`）。 |
 | `deploy/` | 部署脚本占位（iis / windows-service / oracle）。 |
 
 ## 依赖规则
@@ -49,18 +49,20 @@ Tests          -> 被测项目
 | 健康检查 ready | 成功且不探测外部 | 后续可加 Oracle 检查【待现场确认】 |
 | Cursor Cloud | 仅 Fake | 不得在云端连工厂内网/生产库 |
 
-阶段 4 无论配置如何，Infrastructure 注册均强制 Fake 仓储实现，避免误连。夹具说明见 `docs/fake-data.md`。
+阶段 4/5 无论配置如何，Infrastructure 注册均强制 Fake 仓储实现，避免误连。夹具说明见 `docs/fake-data.md`。
 
 运维细节（日志脱敏、Correlation ID、健康检查语义、配置校验）见 `docs/operations.md`。
 
-## API 运行时基础（阶段 2）
+## API 运行时基础（阶段 2 + 阶段 5）
 
 - `GET /health`：详细状态 JSON（含 Fake 标识）
 - `GET /health/live`：存活检查
 - `GET /health/ready`：就绪检查（Fake 下不连外部）
-- 全局异常 → RFC 7807 ProblemDetails
+- `GET /api/v1/reports/production-daily`：生产日报只读聚合查询（见 `docs/api-production-daily.md`）
+- 全局异常 → RFC 7807 ProblemDetails（校验失败 → 400）
 - `X-Correlation-ID` 透传/生成并写入响应头与日志 Scope
 - Development：可读 Console；Production：JSON Console
+- OpenAPI：`MapOpenApi`（Development / Testing）
 
 ## 未来 Oracle 接入位置【待现场确认】
 
@@ -77,4 +79,5 @@ Tests          -> 被测项目
 
 真实连接字符串、密码、Wallet、Token **不得**写入仓库；仅允许 `appsettings.Example.json` 占位说明。
 
-Application 查询入口：`IReportDataQueryService`（供后续报表引擎按 FactoryId / 日期范围 / 组织范围读取；本阶段无报表 API）。
+Application 查询入口：`IReportDataQueryService`（供报表引擎按 FactoryId / 日期范围 / 组织范围读取）。  
+生产日报应用服务：`IProductionDailyReportService`（仅依赖上述抽象，不直接引用 Fake 实现类）。

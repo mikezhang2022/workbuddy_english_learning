@@ -1,3 +1,4 @@
+using FactoryReport.Api.Endpoints;
 using FactoryReport.Api.Health;
 using FactoryReport.Api.Infrastructure;
 using FactoryReport.Api.Logging;
@@ -33,7 +34,7 @@ app.UseCorrelationId();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.MapOpenApi();
 }
@@ -42,6 +43,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     app.UseHttpsRedirection();
 }
+
+// 只读报表 API（阶段 5）：生产日报。无写入端点。
+app.MapProductionDailyReportEndpoints();
 
 app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataStore store) =>
 {

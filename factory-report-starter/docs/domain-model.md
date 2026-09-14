@@ -132,4 +132,6 @@ Application 层：`StableReportCodes`、`PlanAchievementEvaluator`、`IUtcClock`
 - 不实现登录、权限、业务 API、Excel 上传、报表页面；
 - 不添加 SQL Server 相关依赖或代码。
 
-阶段 4 已提供 Fake 内存仓储与确定性夹具（见 `docs/fake-data.md`）。下一步建议：基于 Fake 数据层实现报表查询 API / 生产日报（单独阶段），Oracle 映射与迁移仍为后续独立阶段。
+阶段 4 已提供 Fake 内存仓储与确定性夹具（见 `docs/fake-data.md`）。  
+阶段 5 已基于 Fake 实现生产日报查询 API（见 `docs/api-production-daily.md`）。  
+下一步建议：在 Fake 数据上继续实现其他稳定报表只读 API（如工单进度 / 质量统计），或进入权限与组织范围强制；Oracle 映射与迁移仍为后续独立阶段。

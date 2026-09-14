@@ -69,7 +69,8 @@ Application（`FactoryReport.Application/DataAccess/`）：
 | `IProductionRecordReadRepository` | 生产事实（强制 FactoryId + 日期范围） |
 | `IDailyProductionPlanReadRepository` | 日计划（强制 FactoryId + 日期范围） |
 | `IImportBatchReadRepository` | 导入批次 / 数据版本 |
-| `IReportDataQueryService` / `ReportDataQueryService` | 后续报表引擎聚合查询 |
+| `IReportDataQueryService` / `ReportDataQueryService` | 报表引擎聚合查询入口 |
+| `IProductionDailyReportService` | 生产日报（`production_daily`）只读聚合；见 `docs/api-production-daily.md` |
 
 筛选类型：`OrganizationScopeFilter`、`DateRangeFilter`。
 
