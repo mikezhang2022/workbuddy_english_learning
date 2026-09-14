@@ -1,19 +1,47 @@
+using FactoryReport.Api.Health;
+using FactoryReport.Api.Infrastructure;
+using FactoryReport.Api.Logging;
+using FactoryReport.Api.Middleware;
 using FactoryReport.Application.Abstractions;
+using FactoryReport.Application.Configuration;
 using FactoryReport.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.ConfigureOperationalLogging();
+
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddHealthChecks()
+    .AddCheck(
+        "live",
+        () => HealthCheckResult.Healthy("Process is alive."),
+        tags: ["live"])
+    .AddCheck<FakeReadinessHealthCheck>(
+        "ready",
+        tags: ["ready"]);
+
 var app = builder.Build();
+
+app.UseCorrelationId();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataStore store) =>
 {
@@ -28,6 +56,45 @@ app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataSto
 })
 .WithName("Health");
 
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live"),
+    ResponseWriter = WriteHealthResponseAsync
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = WriteHealthResponseAsync
+});
+
+var options = app.Services.GetRequiredService<IOptions<FactoryReportOptions>>().Value;
+if (options.ExposeTestExceptionEndpoint
+    && (app.Environment.IsEnvironment("Testing") || app.Environment.IsDevelopment()))
+{
+    app.MapGet("/__test/exception", (HttpContext _) =>
+    {
+        throw new InvalidOperationException("Intentional test exception for ProblemDetails.");
+    });
+}
+
 app.Run();
+
+static Task WriteHealthResponseAsync(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+    var payload = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(entry => new
+        {
+            name = entry.Key,
+            status = entry.Value.Status.ToString(),
+            description = entry.Value.Description
+        }),
+        utc = DateTime.UtcNow
+    };
+    return context.Response.WriteAsJsonAsync(payload);
+}
 
 public partial class Program;
