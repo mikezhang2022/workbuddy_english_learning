@@ -106,4 +106,8 @@ dotnet run --project src/FactoryReport.Client
 
 ## 7. 阶段 13：生产日报数据页
 
-已实现第一个真实可查询报表页：`/reports/production-daily`。字段、Fake 标识、范围与离线边界见 **`docs/ui-production-daily.md`**。其余四张报表仍为占位。
+已实现第一个真实可查询报表页：`/reports/production-daily`。字段、Fake 标识、范围与离线边界见 **`docs/ui-production-daily.md`**。
+
+## 8. 阶段 14：工单进度数据页
+
+已实现第二个真实可查询报表页：`/reports/work-order-progress`。字段、Fake 延期规则、范围与离线边界见 **`docs/ui-work-order-progress.md`**。其余三张报表仍为占位。

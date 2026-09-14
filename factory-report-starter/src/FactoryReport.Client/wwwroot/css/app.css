@@ -222,6 +222,15 @@ html, body {
     background: #fff;
 }
 
+.row-overdue {
+    border-left: 4px solid #c62828;
+    background: #fff5f5;
+}
+
+.report-row-card.row-overdue {
+    border-left: 4px solid #c62828;
+}
+
 .row-metrics {
     display: flex;
     flex-wrap: wrap;

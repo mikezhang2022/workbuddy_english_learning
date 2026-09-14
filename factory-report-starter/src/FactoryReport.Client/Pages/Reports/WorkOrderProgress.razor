@@ -1,6 +1,558 @@
 @page "/reports/work-order-progress"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@implements IDisposable
+@using FactoryReport.Application.Reporting.WorkOrderProgress
+@using FactoryReport.Application.Security.DataScope
+@inject IAuthSessionService AuthSession
+@inject ReportsApiClient ReportsApi
+@inject IOnlineStatusService OnlineStatus
+@inject NavigationManager Navigation
 
 <PageTitle>工单进度 - 工厂报表</PageTitle>
 <h1 class="visually-hidden">工单进度</h1>
-<ReportPlaceholder Title="工单进度" />
+
+<MudText Typo="Typo.h6" GutterBottom="true">工单进度</MudText>
+
+@if (!OnlineStatus.IsOnline)
+{
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" aria-live="polite">
+        @ApiConstants.ReportOfflineMessage
+    </MudAlert>
+}
+
+<MudPaper Class="pa-3 mb-3 report-filter-panel" Outlined="true">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">筛选条件</MudText>
+
+    <MudGrid Spacing="2">
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="工厂"
+                       Value="_factoryId"
+                       ValueChanged="OnFactoryChangedAsync"
+                       Required="true"
+                       RequiredError="请选择工厂"
+                       Disabled="_loading"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var f in _factoryOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)f.Id)">@f.Label</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_scope?.IsGlobal == true)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">全局授权：须显式选择一个工厂</MudText>
+            }
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="车间（可选）"
+                       Value="_workshopId"
+                       ValueChanged="OnWorkshopChangedAsync"
+                       Clearable="true"
+                       Disabled="_loading || _factoryId is null"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var w in _workshopOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)w.Id)">@w.Label</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="long?"
+                       Label="产线（可选）"
+                       Value="_productionLineId"
+                       ValueChanged="OnProductionLineChangedAsync"
+                       Clearable="true"
+                       Disabled="_loading || _workshopId is null"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var line in _lineOptions)
+                {
+                    <MudSelectItem T="long?" Value="@((long?)line.Id)">@line.Label</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudTextField @bind-Value="_productCode"
+                          Label="产品编码（可选）"
+                          Disabled="_loading"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudTextField @bind-Value="_workOrderCode"
+                          Label="工单号（可选）"
+                          Disabled="_loading"
+                          Immediate="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudSelect T="string"
+                       Label="状态（可选）"
+                       @bind-Value="_status"
+                       Clearable="true"
+                       Disabled="_loading"
+                       AnchorOrigin="Origin.BottomCenter">
+                @foreach (var s in FakeStatusOptions)
+                {
+                    <MudSelectItem T="string" Value="@s">@s</MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">Fake 临时状态，非 MES 正式枚举</MudText>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudDatePicker Label="计划完成日起始（可选）"
+                           Date="_plannedFinishFrom"
+                           DateChanged="OnPlannedFinishFromChanged"
+                           DateFormat="yyyy-MM-dd"
+                           Editable="true"
+                           Clearable="true"
+                           Disabled="_loading" />
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudDatePicker Label="计划完成日结束（可选）"
+                           Date="_plannedFinishTo"
+                           DateChanged="OnPlannedFinishToChanged"
+                           DateFormat="yyyy-MM-dd"
+                           Editable="true"
+                           Clearable="true"
+                           Disabled="_loading" />
+        </MudItem>
+    </MudGrid>
+
+    @if (!string.IsNullOrWhiteSpace(_filterValidationError))
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@_filterValidationError</MudAlert>
+    }
+
+    <div class="report-filter-actions mt-3">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Disabled="_loading || !OnlineStatus.IsOnline"
+                   OnClick="QueryAsync">
+            查询
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Disabled="_loading"
+                   Class="ml-2"
+                   OnClick="ResetFilters">
+            重置
+        </MudButton>
+    </div>
+</MudPaper>
+
+<ReportQueryFeedback IsLoading="_loading"
+                     ErrorMessage="_errorMessage"
+                     CorrelationId="_errorCorrelationId"
+                     ShowEmpty="_hasQueried && _response is not null && _response.Rows.Count == 0 && string.IsNullOrEmpty(_errorMessage)"
+                     EmptyMessage="当前筛选条件下无数据。" />
+
+@if (_response is not null && string.IsNullOrEmpty(_errorMessage) && !_loading)
+{
+    <MudPaper Class="pa-3 mb-3" Outlined="true">
+        <MudText Typo="Typo.subtitle2">查询元数据</MudText>
+        <MudText Typo="Typo.body2">报表编码：@_response.Meta.ReportCode</MudText>
+        <MudText Typo="Typo.body2">
+            数据模式：@_response.Meta.DataAccessMode
+            @if (_response.Meta.IsFake)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1">Fake 数据</MudChip>
+            }
+        </MudText>
+        <MudText Typo="Typo.body2">
+            查询范围：工厂 @_response.Meta.Filters.FactoryId
+            @if (_response.Meta.Filters.WorkshopId is not null)
+            {
+                <span>，车间 @_response.Meta.Filters.WorkshopId</span>
+            }
+            @if (_response.Meta.Filters.ProductionLineId is not null)
+            {
+                <span>，产线 @_response.Meta.Filters.ProductionLineId</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_response.Meta.Filters.ProductCode))
+            {
+                <span>，产品 @_response.Meta.Filters.ProductCode</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_response.Meta.Filters.WorkOrderCode))
+            {
+                <span>，工单 @_response.Meta.Filters.WorkOrderCode</span>
+            }
+            @if (!string.IsNullOrWhiteSpace(_response.Meta.Filters.Status))
+            {
+                <span>，状态 @_response.Meta.Filters.Status</span>
+            }
+            @if (_response.Meta.Filters.PlannedFinishFrom is not null || _response.Meta.Filters.PlannedFinishTo is not null)
+            {
+                <span>，计划完成
+                    @(_response.Meta.Filters.PlannedFinishFrom?.ToString("yyyy-MM-dd") ?? "—")
+                    ～
+                    @(_response.Meta.Filters.PlannedFinishTo?.ToString("yyyy-MM-dd") ?? "—")
+                </span>
+            }
+        </MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+            @WorkOrderOverdueDisplay.FakeRuleHint
+        </MudAlert>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @_response.Meta.OverdueDisclaimer
+        </MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+            @_response.Meta.CompletionRateRule
+        </MudText>
+    </MudPaper>
+
+    @if (_response.Rows.Count > 0)
+    {
+        <MudText Typo="Typo.subtitle2" Class="mb-2">明细（@_response.Rows.Count 行）</MudText>
+
+        <div class="report-rows-desktop d-none d-md-block">
+            <MudTable Items="_response.Rows" Dense="true" Hover="true" Breakpoint="Breakpoint.None" Class="report-table">
+                <HeaderContent>
+                    <MudTh>工单号</MudTh>
+                    <MudTh>产品</MudTh>
+                    <MudTh>状态</MudTh>
+                    <MudTh>计划数</MudTh>
+                    <MudTh>实际数</MudTh>
+                    <MudTh>完成率</MudTh>
+                    <MudTh>计划开始</MudTh>
+                    <MudTh>计划完成</MudTh>
+                    <MudTh>已完成</MudTh>
+                    <MudTh>延期</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="工单号" Class="@WorkOrderOverdueDisplay.GetRowCssClass(context.IsOverdue)">
+                        @context.WorkOrderCode
+                        @if (context.IsOverdue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-1">@WorkOrderOverdueDisplay.OverdueLabel</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="产品">@context.ProductCode</MudTd>
+                    <MudTd DataLabel="状态">@FormatOptionalText(context.Status)</MudTd>
+                    <MudTd DataLabel="计划数">@FormatQty(context.PlannedQuantity)</MudTd>
+                    <MudTd DataLabel="实际数">@FormatQty(context.ActualQuantity)</MudTd>
+                    <MudTd DataLabel="完成率">@RatioDisplayFormatter.FormatPercent(context.CompletionRate)</MudTd>
+                    <MudTd DataLabel="计划开始">@FormatUtc(context.PlannedStartUtc)</MudTd>
+                    <MudTd DataLabel="计划完成">@FormatUtc(context.PlannedFinishUtc)</MudTd>
+                    <MudTd DataLabel="已完成">@(context.IsCompleted ? "是" : "否")</MudTd>
+                    <MudTd DataLabel="延期">
+                        @if (context.IsOverdue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error">@WorkOrderOverdueDisplay.OverdueLabel</MudChip>
+                        }
+                        else
+                        {
+                            <span>否</span>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </div>
+
+        <div class="report-rows-mobile d-md-none">
+            @foreach (var row in _response.Rows)
+            {
+                <MudPaper Class="@($"pa-3 mb-2 report-row-card {WorkOrderOverdueDisplay.GetRowCssClass(row.IsOverdue)}")" Outlined="true">
+                    <div class="d-flex align-center flex-wrap gap-1">
+                        <MudText Typo="Typo.subtitle2">@row.WorkOrderCode · @row.ProductCode</MudText>
+                        @if (row.IsOverdue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error">@WorkOrderOverdueDisplay.OverdueLabel</MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption">
+                        @row.FactoryCode / @FormatOptionalText(row.WorkshopCode) / @FormatOptionalText(row.ProductionLineCode)
+                    </MudText>
+                    <div class="row-metrics mt-2">
+                        <span>状态 @FormatOptionalText(row.Status)</span>
+                        <span>计划 @FormatQty(row.PlannedQuantity)</span>
+                        <span>实际 @FormatQty(row.ActualQuantity)</span>
+                        <span>完成率 @RatioDisplayFormatter.FormatPercent(row.CompletionRate)</span>
+                        <span>计划开始 @FormatUtc(row.PlannedStartUtc)</span>
+                        <span>计划完成 @FormatUtc(row.PlannedFinishUtc)</span>
+                        <span>已完成 @(row.IsCompleted ? "是" : "否")</span>
+                        <span>延期 @(row.IsOverdue ? WorkOrderOverdueDisplay.OverdueLabel : "否")</span>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+}
+
+@code {
+    private static readonly string[] FakeStatusOptions = ["Open", "Completed", "Closed"];
+
+    private DataScopeSummary? _scope;
+    private IReadOnlyList<OrgOption> _factoryOptions = [];
+    private IReadOnlyList<OrgOption> _workshopOptions = [];
+    private IReadOnlyList<OrgOption> _lineOptions = [];
+
+    private long? _factoryId;
+    private long? _workshopId;
+    private long? _productionLineId;
+    private string? _productCode;
+    private string? _workOrderCode;
+    private string _status = string.Empty;
+    private DateTime? _plannedFinishFrom;
+    private DateTime? _plannedFinishTo;
+
+    private bool _loading;
+    private bool _hasQueried;
+    private string? _filterValidationError;
+    private string? _errorMessage;
+    private string? _errorCorrelationId;
+    private WorkOrderProgressQueryResponse? _response;
+
+    protected override void OnInitialized()
+    {
+        OnlineStatus.ConnectivityChanged += OnConnectivityChanged;
+        ApplyScopeFromSession();
+    }
+
+    public void Dispose()
+    {
+        OnlineStatus.ConnectivityChanged -= OnConnectivityChanged;
+    }
+
+    private void OnConnectivityChanged() => InvokeAsync(StateHasChanged);
+
+    private void ApplyScopeFromSession()
+    {
+        _scope = AuthSession.CurrentUser?.DataScope;
+        _factoryOptions = ReportDataScopeOptions.GetFactoryOptions(_scope);
+        var auto = ReportDataScopeOptions.TryAutoSelectFactory(_scope);
+        _factoryId = auto;
+        RefreshDependentOptions();
+    }
+
+    private void RefreshDependentOptions()
+    {
+        _workshopOptions = ReportDataScopeOptions.GetWorkshopOptions(_scope, _factoryId);
+        if (_workshopId is not null && _workshopOptions.All(w => w.Id != _workshopId))
+        {
+            _workshopId = null;
+        }
+
+        if (_workshopOptions.Count == 1 && _workshopId is null
+            && _scope is not null && !_scope.IsGlobal
+            && !HasFactoryWideForSelected())
+        {
+            _workshopId = _workshopOptions[0].Id;
+        }
+
+        _lineOptions = ReportDataScopeOptions.GetProductionLineOptions(_scope, _factoryId, _workshopId);
+        if (_productionLineId is not null && _lineOptions.All(l => l.Id != _productionLineId))
+        {
+            _productionLineId = null;
+        }
+
+        if (_lineOptions.Count == 1 && _productionLineId is null
+            && _scope is not null && !_scope.IsGlobal
+            && !HasWorkshopWideForSelected())
+        {
+            _productionLineId = _lineOptions[0].Id;
+        }
+    }
+
+    private bool HasFactoryWideForSelected()
+        => _scope is not null
+           && _factoryId is not null
+           && _scope.Grants.Any(g => g.FactoryId == _factoryId && g.WorkshopId is null);
+
+    private bool HasWorkshopWideForSelected()
+        => _scope is not null
+           && _factoryId is not null
+           && _workshopId is not null
+           && (_scope.IsGlobal
+               || _scope.Grants.Any(g =>
+                   g.FactoryId == _factoryId
+                   && g.WorkshopId == _workshopId
+                   && g.ProductionLineId is null)
+               || HasFactoryWideForSelected());
+
+    private Task OnFactoryChangedAsync(long? value)
+    {
+        _factoryId = value;
+        _workshopId = null;
+        _productionLineId = null;
+        RefreshDependentOptions();
+        return Task.CompletedTask;
+    }
+
+    private Task OnWorkshopChangedAsync(long? value)
+    {
+        _workshopId = value;
+        _productionLineId = null;
+        RefreshDependentOptions();
+        return Task.CompletedTask;
+    }
+
+    private Task OnProductionLineChangedAsync(long? value)
+    {
+        _productionLineId = value;
+        return Task.CompletedTask;
+    }
+
+    private void OnPlannedFinishFromChanged(DateTime? value) => _plannedFinishFrom = value;
+
+    private void OnPlannedFinishToChanged(DateTime? value) => _plannedFinishTo = value;
+
+    private void ResetFilters()
+    {
+        _filterValidationError = null;
+        _errorMessage = null;
+        _errorCorrelationId = null;
+        _response = null;
+        _hasQueried = false;
+        _workshopId = null;
+        _productionLineId = null;
+        _productCode = null;
+        _workOrderCode = null;
+        _status = string.Empty;
+        _plannedFinishFrom = null;
+        _plannedFinishTo = null;
+        ApplyScopeFromSession();
+    }
+
+    private async Task QueryAsync()
+    {
+        _filterValidationError = null;
+        _errorMessage = null;
+        _errorCorrelationId = null;
+
+        if (!OnlineStatus.IsOnline)
+        {
+            ClearResultData();
+            _errorMessage = ApiConstants.ReportOfflineMessage;
+            _hasQueried = true;
+            return;
+        }
+
+        if (_scope is null)
+        {
+            ClearResultData();
+            _filterValidationError = "无法读取授权数据范围，请重新登录。";
+            return;
+        }
+
+        if (_factoryId is null or <= 0)
+        {
+            _filterValidationError = "请选择工厂。";
+            return;
+        }
+
+        if (!ReportDataScopeOptions.AllowsFactory(_scope, _factoryId.Value))
+        {
+            ClearResultData();
+            _filterValidationError = "所选工厂不在授权范围内。";
+            return;
+        }
+
+        if (_workshopId is not null
+            && !ReportDataScopeOptions.AllowsWorkshop(_scope, _factoryId.Value, _workshopId.Value))
+        {
+            ClearResultData();
+            _filterValidationError = "所选车间不在授权范围内。";
+            return;
+        }
+
+        if (_productionLineId is not null)
+        {
+            if (_workshopId is null
+                || !ReportDataScopeOptions.AllowsProductionLine(
+                    _scope, _factoryId.Value, _workshopId.Value, _productionLineId.Value))
+            {
+                ClearResultData();
+                _filterValidationError = "所选产线不在授权范围内。";
+                return;
+            }
+        }
+
+        DateOnly? from = _plannedFinishFrom is null
+            ? null
+            : DateOnly.FromDateTime(_plannedFinishFrom.Value);
+        DateOnly? to = _plannedFinishTo is null
+            ? null
+            : DateOnly.FromDateTime(_plannedFinishTo.Value);
+
+        if (from is not null && to is not null && from > to)
+        {
+            _filterValidationError = "计划完成日起始不能晚于结束。";
+            return;
+        }
+
+        _loading = true;
+        ClearResultData();
+        try
+        {
+            var query = new WorkOrderProgressClientQuery
+            {
+                FactoryId = _factoryId.Value,
+                WorkshopId = _workshopId,
+                ProductionLineId = _productionLineId,
+                ProductCode = string.IsNullOrWhiteSpace(_productCode) ? null : _productCode.Trim(),
+                WorkOrderCode = string.IsNullOrWhiteSpace(_workOrderCode) ? null : _workOrderCode.Trim(),
+                Status = string.IsNullOrWhiteSpace(_status) ? null : _status.Trim(),
+                PlannedFinishFrom = from,
+                PlannedFinishTo = to
+            };
+
+            _response = await ReportsApi.GetWorkOrderProgressAsync(query);
+            _hasQueried = true;
+        }
+        catch (ApiRequestException ex)
+        {
+            ClearResultData();
+            _hasQueried = true;
+            _errorCorrelationId = ex.Problem.CorrelationId;
+
+            if (ex.IsUnauthorized)
+            {
+                AuthSession.ClearLocalSession();
+                var returnUrl = Uri.EscapeDataString(
+                    Navigation.ToBaseRelativePath(Navigation.Uri));
+                Navigation.NavigateTo($"login?returnUrl={returnUrl}", replace: true);
+                return;
+            }
+
+            if (ex.IsForbidden)
+            {
+                _errorMessage = ApiConstants.ForbiddenScopeMessage;
+                return;
+            }
+
+            if (ex.Problem.Status is null)
+            {
+                _errorMessage = ApiConstants.ReportOfflineMessage;
+                return;
+            }
+
+            _errorMessage = string.IsNullOrWhiteSpace(ex.Problem.Detail)
+                ? "查询失败，请稍后重试。"
+                : ex.Problem.Detail;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearResultData()
+    {
+        _response = null;
+    }
+
+    private static string FormatQty(decimal value)
+        => value.ToString("0.##");
+
+    private static string FormatOptionalText(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string FormatUtc(DateTimeOffset? value)
+        => value is null ? "—" : value.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") + " UTC";
+}
