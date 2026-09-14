@@ -5,9 +5,9 @@
 | 路径 | 职责 |
 |------|------|
 | `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、**生产日报** / **工单进度** / **质量统计** / **计划达成**（`Reporting/*`）。只依赖 Domain。 |
+| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、**生产日报** / **工单进度** / **质量统计** / **计划达成** / **月度生产计划**（`Reporting/*`）。只依赖 Domain。 |
 | `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、Options 校验、UTC 时钟、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`。 |
-| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、只读报表端点 `production-daily` / `work-order-progress` / `quality-statistics` / `production-plan-achievement`。 |
+| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、只读报表端点 `production-daily` / `work-order-progress` / `quality-statistics` / `production-plan-achievement` / `monthly-production-plan`。 |
 | `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |
 | `src/FactoryReport.Admin` | Blazor 管理后台空壳。依赖 Application，不依赖 Client。 |
 | `src/FactoryReport.Worker` | 后台 Worker：Fake 模式下启动/停止/周期心跳日志；不连 Oracle/MES。 |
@@ -53,7 +53,7 @@ Tests          -> 被测项目
 
 运维细节（日志脱敏、Correlation ID、健康检查语义、配置校验）见 `docs/operations.md`。
 
-## API 运行时基础（阶段 2 + 阶段 5/6/7/8）
+## API 运行时基础（阶段 2 + 阶段 5/6/7/8/9）
 
 - `GET /health`：详细状态 JSON（含 Fake 标识）
 - `GET /health/live`：存活检查
@@ -62,6 +62,7 @@ Tests          -> 被测项目
 - `GET /api/v1/reports/work-order-progress`：工单进度只读查询（见 `docs/api-work-order-progress.md`）
 - `GET /api/v1/reports/quality-statistics`：质量统计只读聚合查询（见 `docs/api-quality-statistics.md`）
 - `GET /api/v1/reports/production-plan-achievement`：生产计划达成只读组合查询（见 `docs/api-production-plan-achievement.md`）
+- `GET /api/v1/reports/monthly-production-plan`：月度生产计划只读日计划行查询（见 `docs/api-monthly-production-plan.md`）
 - 全局异常 → RFC 7807 ProblemDetails（校验失败 → 400）
 - `X-Correlation-ID` 透传/生成并写入响应头与日志 Scope
 - Development：可读 Console；Production：JSON Console

@@ -139,6 +139,22 @@ public static class DeterministicFakeFixture
     public static readonly Guid DatasetVersionFactory2Id = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
 
     /// <summary>
+    /// 工厂 1 的 Draft 非 Active 版本（阶段 9：验证非 Published/Active 行不返回）。
+    /// Fake 临时版本行为；正式 Excel 发布/激活【待现场确认】。
+    /// </summary>
+    public static readonly Guid DatasetVersionFactory1DraftId = Guid.Parse("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+
+    /// <summary>夹具计划月份（与 Day1～Day3 对齐）。</summary>
+    public const string PlanYearMonth202603 = "2026-03";
+
+    public const string DatasetVersionNoFactory1 = "v2026.03.10-fake-f1";
+    public const string DatasetVersionNoFactory2 = "v2026.03.10-fake-f2";
+    public const string DatasetVersionNoFactory1Draft = "v2026.03.10-fake-f1-draft";
+
+    /// <summary>仅存在于 Draft 版本的产品行，Published/Active 查询不得返回。</summary>
+    public const string ProductDraftOnly = "PROD-DRAFT-ONLY";
+
+    /// <summary>
     /// 创建全新只读快照（确定性）。『仅用于开发测试，不代表现场 MES 正式口径』。
     /// </summary>
     public static FakeFixtureSnapshot Create()
@@ -376,15 +392,18 @@ public static class DeterministicFakeFixture
             recordZeroInspection
         };
 
+        // 日计划行均带 PlanVersionId；数量为文件内原始日行，禁止按月均摊推算。
+        // 『仅用于开发测试，不代表现场 MES 正式口径』
         var dailyPlans = new[]
         {
-            // 场景 a：计划 120，对应实际 100
+            // 场景 a：计划 120，对应实际 100（Published/Active）
             new DailyProductionPlanLine(
                 factoryId: FactoryDemo1Id,
                 workshopId: WorkshopAId,
                 planDate: Day1,
                 productCode: ProductNormal,
                 planQuantity: 120m,
+                planVersionId: DatasetVersionFactory1Id,
                 productionLineId: LineA1Id,
                 remark: "scenario-a-normal"),
 
@@ -395,6 +414,7 @@ public static class DeterministicFakeFixture
                 planDate: Day1,
                 productCode: ProductPlanZero,
                 planQuantity: 0m,
+                planVersionId: DatasetVersionFactory1Id,
                 productionLineId: LineA1Id,
                 remark: "scenario-b-plan-zero"),
 
@@ -405,6 +425,7 @@ public static class DeterministicFakeFixture
                 planDate: Day1,
                 productCode: ProductPlanOnly,
                 planQuantity: 80m,
+                planVersionId: DatasetVersionFactory1Id,
                 productionLineId: LineA1Id,
                 remark: "scenario-d-plan-only"),
 
@@ -415,16 +436,18 @@ public static class DeterministicFakeFixture
                 planDate: Day2,
                 productCode: ProductDay2,
                 planQuantity: 35m,
+                planVersionId: DatasetVersionFactory1Id,
                 productionLineId: LineA2Id,
                 remark: "day2-range"),
 
-            // 工厂 2
+            // 工厂 2（Published/Active）
             new DailyProductionPlanLine(
                 factoryId: FactoryDemo2Id,
                 workshopId: WorkshopXId,
                 planDate: Day1,
                 productCode: ProductFactory2,
                 planQuantity: 180m,
+                planVersionId: DatasetVersionFactory2Id,
                 productionLineId: LineX1Id,
                 remark: "scenario-f-isolation"),
 
@@ -435,8 +458,20 @@ public static class DeterministicFakeFixture
                 planDate: Day1,
                 productCode: ProductNormal,
                 planQuantity: 20m,
+                planVersionId: DatasetVersionFactory1Id,
                 productionLineId: LineB1Id,
-                remark: "workshop-b")
+                remark: "workshop-b"),
+
+            // 阶段 9：Draft 版本日行 —— 查询 Published/Active 时不得返回
+            new DailyProductionPlanLine(
+                factoryId: FactoryDemo1Id,
+                workshopId: WorkshopAId,
+                planDate: Day1,
+                productCode: ProductDraftOnly,
+                planQuantity: 999m,
+                planVersionId: DatasetVersionFactory1DraftId,
+                productionLineId: LineA1Id,
+                remark: "draft-not-published")
             // 场景 c：故意不为 ProductActualOnly 配置计划
         };
 
@@ -466,13 +501,15 @@ public static class DeterministicFakeFixture
                 completedAtUtc: FixedUpdatedAtUtc)
         };
 
+        // Fake 版本行为：仅 Published + IsActive 对查询可见；Draft 供负向断言。
+        // 真实 Excel 发布、版本激活、回退规则【待现场确认】。
         var datasetVersions = new[]
         {
             new DatasetVersionState(
                 id: DatasetVersionFactory1Id,
                 factoryId: FactoryDemo1Id,
                 datasetCode: ReportCodes.MonthlyProductionPlan,
-                versionNo: "v2026.03.10-fake-f1",
+                versionNo: DatasetVersionNoFactory1,
                 publishStatus: DatasetPublishStatus.Published,
                 isActive: true,
                 createdAtUtc: FixedPublishedAtUtc,
@@ -481,11 +518,21 @@ public static class DeterministicFakeFixture
                 id: DatasetVersionFactory2Id,
                 factoryId: FactoryDemo2Id,
                 datasetCode: ReportCodes.MonthlyProductionPlan,
-                versionNo: "v2026.03.10-fake-f2",
+                versionNo: DatasetVersionNoFactory2,
                 publishStatus: DatasetPublishStatus.Published,
                 isActive: true,
                 createdAtUtc: FixedPublishedAtUtc,
-                publishedAtUtc: FixedPublishedAtUtc)
+                publishedAtUtc: FixedPublishedAtUtc),
+            // 非 Published/Active：阶段 9 负向测试夹具
+            new DatasetVersionState(
+                id: DatasetVersionFactory1DraftId,
+                factoryId: FactoryDemo1Id,
+                datasetCode: ReportCodes.MonthlyProductionPlan,
+                versionNo: DatasetVersionNoFactory1Draft,
+                publishStatus: DatasetPublishStatus.Draft,
+                isActive: false,
+                createdAtUtc: FixedPublishedAtUtc,
+                publishedAtUtc: null)
         };
 
         return new FakeFixtureSnapshot(

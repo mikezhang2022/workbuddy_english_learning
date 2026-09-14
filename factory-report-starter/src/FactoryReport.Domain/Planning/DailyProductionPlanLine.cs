@@ -4,6 +4,7 @@ namespace FactoryReport.Domain.Planning;
 
 /// <summary>
 /// 月度生产计划日行。必须保留 <see cref="PlanDate"/>（业务计划日，非系统时间）。
+/// <see cref="PlanVersionId"/> 关联数据集版本；正式发布/激活规则【待现场确认】。
 /// </summary>
 public sealed class DailyProductionPlanLine
 {
@@ -15,12 +16,19 @@ public sealed class DailyProductionPlanLine
     public decimal PlanQuantity { get; }
     public string? Remark { get; }
 
+    /// <summary>
+    /// 所属计划数据版本 Id（对应 <c>DatasetVersionState.Id</c>）。
+    /// Fake 层用其过滤 Published/Active；正式 Excel 发布链路【待现场确认】。
+    /// </summary>
+    public Guid PlanVersionId { get; }
+
     public DailyProductionPlanLine(
         long factoryId,
         long workshopId,
         DateOnly planDate,
         string productCode,
         decimal planQuantity,
+        Guid planVersionId,
         long? productionLineId = null,
         string? remark = null)
     {
@@ -44,6 +52,11 @@ public sealed class DailyProductionPlanLine
             throw new ArgumentException("PlanDate is required and must be a valid calendar date.", nameof(planDate));
         }
 
+        if (planVersionId == Guid.Empty)
+        {
+            throw new ArgumentException("PlanVersionId must be a non-empty GUID.", nameof(planVersionId));
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(productCode);
         QuantityGuard.EnsureNonNegative(planQuantity, nameof(planQuantity));
 
@@ -53,6 +66,7 @@ public sealed class DailyProductionPlanLine
         PlanDate = planDate;
         ProductCode = productCode.Trim();
         PlanQuantity = planQuantity;
+        PlanVersionId = planVersionId;
         Remark = string.IsNullOrWhiteSpace(remark) ? null : remark.Trim();
     }
 }

@@ -4,7 +4,8 @@ using FactoryReport.Domain.Common;
 namespace FactoryReport.Domain.Planning;
 
 /// <summary>
-/// 月度生产计划头。日计划行集合必须各自携带 PlanDate。
+/// 月度生产计划头。日计划行集合必须各自携带 PlanDate（不得由月总量均摊推算）。
+/// <see cref="PlanVersionId"/> 关联数据集版本；正式发布/激活规则【待现场确认】。
 /// </summary>
 public sealed class MonthlyProductionPlan
 {
@@ -13,6 +14,12 @@ public sealed class MonthlyProductionPlan
     public long Id { get; }
     public long FactoryId { get; }
     public string PlanYearMonth { get; }
+
+    /// <summary>
+    /// 所属计划数据版本 Id。Fake 过滤 Published/Active；正式规则【待现场确认】。
+    /// </summary>
+    public Guid PlanVersionId { get; }
+
     public IReadOnlyList<DailyProductionPlanLine> Lines { get; }
     public UtcInstant CreatedAtUtc { get; }
 
@@ -20,6 +27,7 @@ public sealed class MonthlyProductionPlan
         long id,
         long factoryId,
         string planYearMonth,
+        Guid planVersionId,
         IEnumerable<DailyProductionPlanLine> lines,
         UtcInstant createdAtUtc)
     {
@@ -31,6 +39,11 @@ public sealed class MonthlyProductionPlan
         if (factoryId <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(factoryId), "FactoryId must be a positive identifier.");
+        }
+
+        if (planVersionId == Guid.Empty)
+        {
+            throw new ArgumentException("PlanVersionId must be a non-empty GUID.", nameof(planVersionId));
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(planYearMonth);
@@ -48,11 +61,17 @@ public sealed class MonthlyProductionPlan
             {
                 throw new ArgumentException("Daily plan line FactoryId must match the monthly plan FactoryId.", nameof(lines));
             }
+
+            if (line.PlanVersionId != planVersionId)
+            {
+                throw new ArgumentException("Daily plan line PlanVersionId must match the monthly plan PlanVersionId.", nameof(lines));
+            }
         }
 
         Id = id;
         FactoryId = factoryId;
         PlanYearMonth = planYearMonth.Trim();
+        PlanVersionId = planVersionId;
         _lines = materialized;
         Lines = new ReadOnlyCollection<DailyProductionPlanLine>(_lines);
         CreatedAtUtc = createdAtUtc;

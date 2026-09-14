@@ -16,8 +16,8 @@
 | 产品 | 7 | 覆盖边界场景、日期筛选与零检验数 |
 | 工单 | 7 | 工厂 1：正常进行中 / 计划 0 / 车间 B / 已关闭 / 已完成 / 未完成延期候选；工厂 2：隔离工单。含计划开始/完成 UTC 与 Fake 临时状态 |
 | 生产事实 | 7 | 含完整数量分列、跨车间/跨厂与零检验数 |
-| 日计划行 | 6 | 故意缺省「仅有实际」产品的计划 |
-| 导入批次 / 版本 | 各 2 | `monthly_production_plan`，按工厂隔离 |
+| 日计划行 | 7 | 含 Published/Active 行 + 工厂 1 Draft 负向样例；故意缺省「仅有实际」产品的计划 |
+| 导入批次 / 版本 | 批次 2 / 版本 3 | `monthly_production_plan`；工厂 1 含 Published+Active 与 Draft 各一；按工厂隔离 |
 
 ### 固定 UTC 日期（不依赖系统时钟）
 
@@ -108,6 +108,7 @@ Application（`FactoryReport.Application/DataAccess/`）：
 | `IWorkOrderProgressReportService` | 工单进度（`work_order_progress`）只读查询；见 `docs/api-work-order-progress.md` |
 | `IQualityStatisticsReportService` | 质量统计（`quality_statistics`）只读聚合；见 `docs/api-quality-statistics.md` |
 | `IProductionPlanAchievementReportService` | 生产计划达成（`production_plan_achievement`）只读组合查询；见 `docs/api-production-plan-achievement.md` |
+| `IMonthlyProductionPlanReportService` | 月度生产计划（`monthly_production_plan`）只读日计划行查询；见 `docs/api-monthly-production-plan.md` |
 
 筛选类型：`OrganizationScopeFilter`、`DateRangeFilter`。
 
@@ -115,6 +116,17 @@ Application（`FactoryReport.Application/DataAccess/`）：
 
 夹具已覆盖四边界（§2 a–d），本阶段**未新增**夹具行；关联键与状态见领域 `PlanAchievementResult`。  
 API 读取日计划 + 生产事实后按键组合；**不得**用月计划平均推算日计划。
+
+### 月度生产计划场景（阶段 9）
+
+| 项 | 说明 |
+|---|---|
+| 计划月 | `2026-03`（与 Day1～Day3 对齐） |
+| Published/Active | 工厂 1/2 各一 Active Published 版本；查询仅返回其日行 |
+| Draft 负向 | 工厂 1 `DatasetVersionFactory1DraftId` + `PROD-DRAFT-ONLY`；不得出现在查询结果 |
+| 日行原则 | 返回夹具原始 `DailyProductionPlanLine`（含 `PlanDate`/`PlanQuantity`/`PlanVersionId`）；**无**月均摊逻辑 |
+
+> **Fake 版本行为**（非正式）：仅 `Published && IsActive`。真实 Excel 发布、激活、回退【待现场确认】。
 
 ---
 

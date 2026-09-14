@@ -4,9 +4,9 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 8 完成）
+## 当前状态（阶段 9 完成）
 
-已实现稳定报表编码 **`production_plan_achievement`** 的只读查询 API（基于 Application 抽象 + Fake 内存数据层）；阶段 5/6/7 的 **`production_daily`** / **`work_order_progress`** / **`quality_statistics`** 仍保留。
+已实现稳定报表编码 **`monthly_production_plan`** 的只读查询 API（基于 Application 抽象 + Fake 内存数据层）；阶段 5/6/7/8 的 **`production_daily`** / **`work_order_progress`** / **`quality_statistics`** / **`production_plan_achievement`** 仍保留。
 
 - 默认 **Fake 模式**（进程内确定性夹具，不连接任何数据库）。
 - **API**：
@@ -14,9 +14,11 @@
   - `GET /api/v1/reports/work-order-progress`（阶段 6；见 `docs/api-work-order-progress.md`）
   - `GET /api/v1/reports/quality-statistics`（阶段 7；见 `docs/api-quality-statistics.md`）
   - `GET /api/v1/reports/production-plan-achievement`（阶段 8；见 `docs/api-production-plan-achievement.md`）
-- Application：`IProductionPlanAchievementReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读日计划与实际；用 `PlanAchievementEvaluator` 计算；API 不直接依赖 Fake 实现类。
-- **已确认达成规则**：计划&gt;0 → Actual/Plan；计划=0 → `null`（`PlanIsZero`）；有实际无计划 → `null`（`PlanNotConfigured`，不得显示 0%）；有计划无实际 → Actual=0、达成率=0（`MissingActual`）；不得用月计划平均推算日计划。
-- **本阶段不包含** 报表页面、登录/权限、MES 同步、Excel、Oracle Migration/DDL、SQL Server。
+  - `GET /api/v1/reports/monthly-production-plan`（阶段 9；见 `docs/api-monthly-production-plan.md`）
+- Application：`IMonthlyProductionPlanReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读日计划与数据集版本；API 不直接依赖 Fake 实现类。
+- **日计划原则**：返回月度文件内日计划行（保留 `PlanDate`）；**不得**将月计划平均推算到每天。
+- **Fake 版本规则**：仅返回 `Published` 且 `Active` 的计划版本（夹具含 Draft 负向样例）；真实 Excel 发布/激活/回退【待现场确认】。
+- **本阶段不包含** 报表页面、登录/权限、MES 同步、Excel 写入、Oracle Migration/DDL、SQL Server。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
@@ -43,6 +45,7 @@
 - `docs/api-work-order-progress.md`：工单进度查询 API（阶段 6；参数、响应、Fake 延期规则与待确认项）。
 - `docs/api-quality-statistics.md`：质量统计查询 API（阶段 7；参数、响应、Fake 良率/不良率口径与待确认项）。
 - `docs/api-production-plan-achievement.md`：生产计划达成查询 API（阶段 8；参数、关联键、四边界状态与待确认项）。
+- `docs/api-monthly-production-plan.md`：月度生产计划查询 API（阶段 9；参数、日计划行原则、Fake 版本规则与待确认项）。
 - `docs/data-dictionary.md`：数据字典（规划口径）。
 - `docs/business-decisions.md`：业务决策记录（已确认 / Fake 临时 / 待现场确认）。
 - `docs/source-mapping-template.md`：源系统映射模板（待现场填写）。
@@ -108,6 +111,12 @@ curl -s "http://localhost:5000/api/v1/reports/quality-statistics?factoryId=1&sta
 
 ```bash
 curl -s "http://localhost:5000/api/v1/reports/production-plan-achievement?factoryId=1&startDate=2026-03-10&endDate=2026-03-10"
+```
+
+月度生产计划示例：
+
+```bash
+curl -s "http://localhost:5000/api/v1/reports/monthly-production-plan?factoryId=1&planMonth=2026-03"
 ```
 
 配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token、连接字符串或 Oracle Wallet。

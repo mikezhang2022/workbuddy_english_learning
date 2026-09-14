@@ -47,25 +47,34 @@ public class IdentifierValidationTests
     public void Daily_plan_line_requires_plan_date()
     {
         Assert.Throws<ArgumentException>(() =>
-            new DailyProductionPlanLine(1, 1, default, "P-1", 10m));
+            new DailyProductionPlanLine(1, 1, default, "P-1", 10m, Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")));
     }
 
     [Fact]
     public void Daily_plan_line_rejects_blank_product_code()
     {
         Assert.ThrowsAny<ArgumentException>(() =>
-            new DailyProductionPlanLine(1, 1, new DateOnly(2026, 9, 1), "  ", 10m));
+            new DailyProductionPlanLine(1, 1, new DateOnly(2026, 9, 1), "  ", 10m, Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")));
+    }
+
+    [Fact]
+    public void Daily_plan_line_rejects_empty_plan_version_id()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new DailyProductionPlanLine(1, 1, new DateOnly(2026, 9, 1), "P-1", 10m, Guid.Empty));
     }
 
     [Fact]
     public void Monthly_plan_rejects_invalid_year_month()
     {
+        var versionId = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
         Assert.Throws<ArgumentException>(() =>
             new MonthlyProductionPlan(
                 1,
                 1,
                 "2026-13",
-                [new DailyProductionPlanLine(1, 1, new DateOnly(2026, 9, 1), "P-1", 1m)],
+                versionId,
+                [new DailyProductionPlanLine(1, 1, new DateOnly(2026, 9, 1), "P-1", 1m, versionId)],
                 UtcInstant.Now()));
     }
 
