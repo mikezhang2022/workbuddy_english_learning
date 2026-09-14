@@ -1,12 +1,12 @@
-# 架构说明（阶段 3）
+# 架构说明（阶段 4）
 
 ## 目录职责
 
 | 路径 | 职责 |
 |------|------|
-| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动。详见 `docs/domain-model.md`。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`。只依赖 Domain。 |
-| `src/FactoryReport.Infrastructure` | 技术实现：Fake 内存数据、Options 校验、未来 Oracle 持久化。依赖 Application + Domain。 |
+| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
+| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`。只依赖 Domain。 |
+| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、Options 校验、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`。 |
 | `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志。 |
 | `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |
 | `src/FactoryReport.Admin` | Blazor 管理后台空壳。依赖 Application，不依赖 Client。 |
@@ -42,14 +42,14 @@ Tests          -> 被测项目
 
 | 项 | Fake（默认） | 现场 |
 |----|--------------|------|
-| 数据 | 内存实现（`Infrastructure/Fake`） | Oracle 持久化 |
+| 数据 | 确定性内存夹具（`Infrastructure/Fake` + `DeterministicFakeFixture`） | Oracle 持久化 |
 | 连接 | **禁止**连接任何数据库 | 服务器注入连接串/密钥 |
 | 配置 | `FactoryReport:DataMode=Fake` | `Oracle`（【待现场确认】） |
 | MES 同步 | Worker 仅心跳，不读 MES | 后续阶段 + 现场只读视图 |
 | 健康检查 ready | 成功且不探测外部 | 后续可加 Oracle 检查【待现场确认】 |
 | Cursor Cloud | 仅 Fake | 不得在云端连工厂内网/生产库 |
 
-阶段 2 无论配置如何，Infrastructure 注册均强制 Fake 实现，避免误连。
+阶段 4 无论配置如何，Infrastructure 注册均强制 Fake 仓储实现，避免误连。夹具说明见 `docs/fake-data.md`。
 
 运维细节（日志脱敏、Correlation ID、健康检查语义、配置校验）见 `docs/operations.md`。
 
@@ -72,7 +72,9 @@ Tests          -> 被测项目
 
 1. EF Core `DbContext`（`Oracle.EntityFrameworkCore`）
 2. ODP.NET / `Oracle.ManagedDataAccess.Core` 连接与批量写入
-3. 实现 Application 中的仓储/数据抽象，替换 Fake
+3. 实现 Application `DataAccess` 下的 `I*ReadRepository`，在 `DependencyInjection.cs` 按 `DataMode` 替换 Fake
 4. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
 
 真实连接字符串、密码、Wallet、Token **不得**写入仓库；仅允许 `appsettings.Example.json` 占位说明。
+
+Application 查询入口：`IReportDataQueryService`（供后续报表引擎按 FactoryId / 日期范围 / 组织范围读取；本阶段无报表 API）。
