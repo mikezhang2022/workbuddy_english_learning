@@ -5,6 +5,7 @@ using FactoryReport.Application.Reporting.ProductionDaily;
 using FactoryReport.Domain.Common;
 using FactoryReport.Domain.Production;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.UnitTests.Security;
 
 namespace FactoryReport.UnitTests.Reporting;
 
@@ -30,7 +31,8 @@ public class ProductionDailyReportServiceTests
         return new ProductionDailyReportService(
             query,
             new FakeDataAccessModeProvider(),
-            new FixedClock());
+            new FixedClock(),
+            new PermissiveReportQueryScopeService());
     }
 
     private static ProductionDailyQueryRequest BaseRequest(

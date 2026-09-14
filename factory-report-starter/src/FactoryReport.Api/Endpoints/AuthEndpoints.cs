@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FactoryReport.Api.Middleware;
 using FactoryReport.Api.Security;
 using FactoryReport.Application.Security;
+using FactoryReport.Application.Security.DataScope;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Antiforgery;
@@ -48,6 +49,7 @@ public static class AuthEndpoints
         LoginRequest? request,
         HttpContext httpContext,
         ILocalAccountAuthenticationService authService,
+        IUserScopeResolver userScopeResolver,
         IAntiforgery antiforgery,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -107,7 +109,11 @@ public static class AuthEndpoints
             httpContext.GetCorrelationId(),
             result.User.UserId);
 
-        return Results.Ok(AuthMeResponse.From(result.User));
+        var scope = await userScopeResolver
+            .ResolveAsync(result.User.UserId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Results.Ok(AuthMeResponse.From(result.User, DataScopeSummary.From(scope)));
     }
 
     private static async Task<IResult> LogoutAsync(
@@ -145,7 +151,10 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 
-    private static IResult MeAsync(ICurrentUserAccessor currentUserAccessor)
+    private static async Task<IResult> MeAsync(
+        ICurrentUserAccessor currentUserAccessor,
+        IUserScopeResolver userScopeResolver,
+        CancellationToken cancellationToken)
     {
         var user = currentUserAccessor.GetCurrentUser();
         if (user is null)
@@ -156,7 +165,11 @@ public static class AuthEndpoints
                 title: "Unauthorized");
         }
 
-        return Results.Ok(AuthMeResponse.From(user));
+        var scope = await userScopeResolver
+            .ResolveAsync(user.UserId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Results.Ok(AuthMeResponse.From(user, DataScopeSummary.From(scope)));
     }
 
     private static IResult UnauthorizedLogin()
@@ -179,14 +192,16 @@ public sealed class AuthMeResponse
     public required string DisplayName { get; init; }
     public required IReadOnlyList<string> Roles { get; init; }
     public bool IsAuthenticated { get; init; }
+    public DataScopeSummary? DataScope { get; init; }
 
-    public static AuthMeResponse From(CurrentUser user)
+    public static AuthMeResponse From(CurrentUser user, DataScopeSummary? dataScope = null)
         => new()
         {
             UserId = user.UserId,
             UserName = user.UserName,
             DisplayName = user.DisplayName,
             Roles = user.Roles,
-            IsAuthenticated = user.IsAuthenticated
+            IsAuthenticated = user.IsAuthenticated,
+            DataScope = dataScope
         };
 }

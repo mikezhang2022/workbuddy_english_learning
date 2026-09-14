@@ -93,6 +93,7 @@ public class AppRolesAndPoliciesTests
     public void AuthorizationPolicyNames_AreStable()
     {
         Assert.Equal("RequireAuthenticated", AuthorizationPolicies.RequireAuthenticated);
+        Assert.Equal("ReportRead", AuthorizationPolicies.ReportRead);
         Assert.Equal("CanViewProductionReports", AuthorizationPolicies.CanViewProductionReports);
         Assert.Equal("CanViewQualityReports", AuthorizationPolicies.CanViewQualityReports);
     }

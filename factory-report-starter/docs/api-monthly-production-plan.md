@@ -13,7 +13,7 @@
 |---|---|
 | 方法 | `GET` |
 | 路径 | `/api/v1/reports/monthly-production-plan` |
-| 认证 | 本阶段未启用（后续权限阶段） |
+| 认证 | **需要登录**（`ReportRead`）；Cookie 会话。未登录 → 401；组织范围越权 → 403。详见 `docs/authorization-and-data-scope.md` |
 | 写入 | **无**；本阶段不提供 Excel 上传 / 发布 / 回退或任何 POST/PUT/PATCH/DELETE |
 
 OpenAPI：Development / Testing 环境可通过 `GET /openapi/v1.json` 查看（`MapOpenApi`）。
@@ -24,7 +24,7 @@ OpenAPI：Development / Testing 环境可通过 `GET /openapi/v1.json` 查看（
 
 | 参数 | 类型 | 必填 | 语义 |
 |---|---|---|---|
-| `factoryId` | long | **是** | 工厂 ID；正整数。缺失或 ≤0 → 400 ProblemDetails |
+| `factoryId` | long | **是**（登录后仍必填；不得省略以扩大范围） | 工厂 ID；正整数。缺失或 ≤0 → 400 ProblemDetails |
 | `planMonth` | string (`yyyy-MM`) | **是** | 计划月份；严格四位年 + `-` + 两位月。非法格式 → 400 |
 | `workshopId` | long | 否 | 车间 ID；若提供须为正整数 |
 | `productionLineId` | long | 否 | 产线 ID；若提供须为正整数 |
@@ -152,6 +152,8 @@ X-Correlation-ID: demo-mpp-001
 | 月份内无 Published/Active 计划 | `200` + 空 `rows` |
 | Draft 等非可见版本行 | **不返回** |
 | 跨工厂 | 强制按 `factoryId` 过滤 |
+| 未登录 | `401` ProblemDetails |
+| 组织范围越权 | `403` ProblemDetails |
 | 未处理异常 | `500` ProblemDetails + `correlationId` |
 
 ---

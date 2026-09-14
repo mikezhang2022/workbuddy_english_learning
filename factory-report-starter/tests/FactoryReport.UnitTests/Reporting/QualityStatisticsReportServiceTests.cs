@@ -4,6 +4,7 @@ using FactoryReport.Application.DataAccess;
 using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Domain.Common;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.UnitTests.Security;
 
 namespace FactoryReport.UnitTests.Reporting;
 
@@ -29,7 +30,8 @@ public class QualityStatisticsReportServiceTests
         return new QualityStatisticsReportService(
             query,
             new FakeDataAccessModeProvider(),
-            new FixedClock());
+            new FixedClock(),
+            new PermissiveReportQueryScopeService());
     }
 
     private static QualityStatisticsQueryRequest BaseRequest(

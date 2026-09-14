@@ -1,4 +1,5 @@
 using FactoryReport.Application.Reporting.ProductionPlanAchievement;
+using FactoryReport.Domain.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +26,10 @@ public static class ProductionPlanAchievementReportEndpoints
                 "有计划无实际 → Actual=0、AchievementRate=0（MissingActual）；" +
                 "不得用月计划平均推算日计划。只读，无写入。")
             .Produces<ProductionPlanAchievementQueryResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .RequireAuthorization(AuthorizationPolicies.ReportRead);
 
         return app;
     }

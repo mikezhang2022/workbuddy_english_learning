@@ -1,6 +1,7 @@
 using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Common;
 using FactoryReport.Application.DataAccess;
+using FactoryReport.Application.Security.DataScope;
 using FactoryReport.Domain.Import;
 using FactoryReport.Domain.Planning;
 using FactoryReport.Domain.Reporting;
@@ -20,15 +21,18 @@ public sealed class MonthlyProductionPlanReportService : IMonthlyProductionPlanR
     private readonly IReportDataQueryService _queryService;
     private readonly IDataAccessModeProvider _dataAccessModeProvider;
     private readonly IUtcClock _clock;
+    private readonly IReportQueryScopeService _queryScopeService;
 
     public MonthlyProductionPlanReportService(
         IReportDataQueryService queryService,
         IDataAccessModeProvider dataAccessModeProvider,
-        IUtcClock clock)
+        IUtcClock clock,
+        IReportQueryScopeService queryScopeService)
     {
         _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
         _dataAccessModeProvider = dataAccessModeProvider ?? throw new ArgumentNullException(nameof(dataAccessModeProvider));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _queryScopeService = queryScopeService ?? throw new ArgumentNullException(nameof(queryScopeService));
     }
 
     public async Task<MonthlyProductionPlanQueryResponse> QueryAsync(
@@ -38,10 +42,13 @@ public sealed class MonthlyProductionPlanReportService : IMonthlyProductionPlanR
         ArgumentNullException.ThrowIfNull(request);
         var validated = Validate(request);
 
-        var scope = new OrganizationScopeFilter(
-            validated.FactoryId,
-            validated.WorkshopId,
-            validated.ProductionLineId);
+        var scope = await _queryScopeService
+            .ResolveEffectiveOrganizationScopeAsync(
+                validated.FactoryId,
+                validated.WorkshopId,
+                validated.ProductionLineId,
+                cancellationToken)
+            .ConfigureAwait(false);
         var dateRange = new DateRangeFilter(validated.MonthStart, validated.MonthEnd);
 
         var versionsTask = _queryService.GetDatasetVersionsAsync(

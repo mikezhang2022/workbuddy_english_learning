@@ -7,6 +7,7 @@ using FactoryReport.Application.Reporting.ProductionPlanAchievement;
 using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
 using FactoryReport.Application.Security;
+using FactoryReport.Application.Security.DataScope;
 using FactoryReport.Infrastructure.Fake;
 using FactoryReport.Infrastructure.Options;
 using FactoryReport.Infrastructure.Security;
@@ -62,6 +63,8 @@ public static class DependencyInjection
         // Oracle：仅预留接口；本阶段未实现，配置为 Oracle 时显式失败，禁止静默回退 Fake。
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ILocalAccountAuthenticationService, LocalAccountAuthenticationService>();
+        services.AddSingleton<IUserScopeResolver, LocalAccountUserScopeResolver>();
+        services.AddScoped<IReportQueryScopeService, ReportQueryScopeService>();
 
         var accountStore = configuration
             .GetSection(FactoryReportOptions.SectionName)
@@ -86,10 +89,11 @@ public static class DependencyInjection
 
         // 【待现场确认】未来 Oracle 替换点：
         // 1. 在 Persistence/Oracle/ 实现上述 I*ReadRepository 接口（DbContext / ODP.NET）。
-        // 2. 实现 ILocalAccountStore 的 Oracle 版本（正式账号/密码哈希/角色持久化），按 AccountStore=Oracle 切换（替换上方 throw）。
-        // 3. 按 DataMode=Oracle 在本方法切换仓储注册（凭据由服务器环境注入，不得写入仓库）。
-        // 4. 不得在 Cursor Cloud 启用 Oracle 模式。
-        // 见 OraclePersistencePlaceholder、docs/fake-data.md、docs/authentication.md。
+        // 2. 实现 ILocalAccountStore 的 Oracle 版本（正式账号/密码哈希/角色/数据范围持久化），按 AccountStore=Oracle 切换（替换上方 throw）。
+        // 3. 实现 IUserScopeResolver 的 Oracle 版本（或复用 LocalAccountUserScopeResolver + Oracle store）。
+        // 4. 按 DataMode=Oracle 在本方法切换仓储注册（凭据由服务器环境注入，不得写入仓库）。
+        // 5. 不得在 Cursor Cloud 启用 Oracle 模式。
+        // 见 OraclePersistencePlaceholder、docs/fake-data.md、docs/authentication.md、docs/authorization-and-data-scope.md。
         _ = configuredMode;
 
         return services;

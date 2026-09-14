@@ -199,12 +199,12 @@ public class AuthApiTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
-    public async Task ExistingReportApi_RemainsAnonymousAccessible()
+    public async Task ExistingReportApi_RequiresAuthentication()
     {
         var client = CreateCookieClient();
         var response = await client.GetAsync(
             "/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-10");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private HttpClient CreateCookieClient()

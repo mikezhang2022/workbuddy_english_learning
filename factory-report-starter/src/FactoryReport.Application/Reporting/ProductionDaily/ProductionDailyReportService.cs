@@ -1,6 +1,7 @@
 using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Common;
 using FactoryReport.Application.DataAccess;
+using FactoryReport.Application.Security.DataScope;
 using FactoryReport.Domain.Production;
 
 namespace FactoryReport.Application.Reporting.ProductionDaily;
@@ -15,15 +16,18 @@ public sealed class ProductionDailyReportService : IProductionDailyReportService
     private readonly IReportDataQueryService _queryService;
     private readonly IDataAccessModeProvider _dataAccessModeProvider;
     private readonly IUtcClock _clock;
+    private readonly IReportQueryScopeService _queryScopeService;
 
     public ProductionDailyReportService(
         IReportDataQueryService queryService,
         IDataAccessModeProvider dataAccessModeProvider,
-        IUtcClock clock)
+        IUtcClock clock,
+        IReportQueryScopeService queryScopeService)
     {
         _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
         _dataAccessModeProvider = dataAccessModeProvider ?? throw new ArgumentNullException(nameof(dataAccessModeProvider));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _queryScopeService = queryScopeService ?? throw new ArgumentNullException(nameof(queryScopeService));
     }
 
     public async Task<ProductionDailyQueryResponse> QueryAsync(
@@ -33,10 +37,14 @@ public sealed class ProductionDailyReportService : IProductionDailyReportService
         ArgumentNullException.ThrowIfNull(request);
         var validated = Validate(request);
 
-        var scope = new OrganizationScopeFilter(
-            validated.FactoryId,
-            validated.WorkshopId,
-            validated.ProductionLineId);
+        var scope = await _queryScopeService
+            .ResolveEffectiveOrganizationScopeAsync(
+                validated.FactoryId,
+                validated.WorkshopId,
+                validated.ProductionLineId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var dateRange = new DateRangeFilter(validated.StartDate, validated.EndDate);
 
         var records = await _queryService

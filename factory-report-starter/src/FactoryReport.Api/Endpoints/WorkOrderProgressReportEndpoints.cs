@@ -1,4 +1,5 @@
 using FactoryReport.Application.Reporting.WorkOrderProgress;
+using FactoryReport.Domain.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,7 +22,10 @@ public static class WorkOrderProgressReportEndpoints
                 "延期 Fake 规则：未完成且未关闭，且 UtcNow > PlannedFinishUtc。" +
                 "『Fake 测试规则：现场须确认工单状态枚举、时区、延期口径与计划时间来源』。只读，无写入。")
             .Produces<WorkOrderProgressQueryResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .RequireAuthorization(AuthorizationPolicies.ReportRead);
 
         return app;
     }

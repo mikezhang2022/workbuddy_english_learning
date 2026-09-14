@@ -4,25 +4,28 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 10 完成）
+## 当前状态（阶段 11 完成）
 
-已实现 **本地账号密码 + 安全 Cookie** 认证基础（Fake 内存账号；Production 拒绝 Fake）。阶段 5–9 的只读报表 API 仍保留，**暂不**强制 `RequireAuthorization`。
+已实现 **报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 的 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
 
 - 默认 **Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。
 - **认证 API**（见 `docs/authentication.md`）：
   - `POST /api/v1/auth/login`
   - `POST /api/v1/auth/logout`（Antiforgery）
-  - `GET /api/v1/auth/me`
-- **报表 API**（阶段 5–9；均暂不强制登录）：
-  - `GET /api/v1/reports/production-daily`（见 `docs/api-production-daily.md`）
-  - `GET /api/v1/reports/work-order-progress`（见 `docs/api-work-order-progress.md`）
-  - `GET /api/v1/reports/quality-statistics`（见 `docs/api-quality-statistics.md`）
-  - `GET /api/v1/reports/production-plan-achievement`（见 `docs/api-production-plan-achievement.md`）
-  - `GET /api/v1/reports/monthly-production-plan`（见 `docs/api-monthly-production-plan.md`）
+  - `GET /api/v1/auth/me`（含 `dataScope` 摘要）
+- **授权与数据范围**（见 `docs/authorization-and-data-scope.md`）：
+  - 策略 `ReportRead`：五个角色均可
+  - 未登录报表 → 401；组织越权 → 403（不返回空数据伪装成功）
+  - 范围来自服务端账号配置，不得靠 query / Header / 角色 Claim 扩大
+- **报表 API**（阶段 5–9 + 11 强制认证与范围；`factoryId` 仍必填）：
+  - `GET /api/v1/reports/production-daily`
+  - `GET /api/v1/reports/work-order-progress`
+  - `GET /api/v1/reports/quality-statistics`
+  - `GET /api/v1/reports/production-plan-achievement`
+  - `GET /api/v1/reports/monthly-production-plan`
 - Cookie：HttpOnly；Production 强制 Secure；SameSite=Lax；不存密码/权限明细。
-- 角色：`SystemAdmin` / `FactoryAdmin` / `ProductionManager` / `QualityUser` / `Viewer`（策略已定义）。
 - Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
-- **本阶段不包含** 组织数据范围强制、用户管理 UI、Oracle 账号持久化、Excel 写入、MES 同步、报表页面。
+- **本阶段不包含** 用户管理 UI、正式权限分配、角色×报表细粒度矩阵、Oracle 账号持久化、Excel 写入、MES 同步、报表页面。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
@@ -44,6 +47,7 @@
 - `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
 - `docs/authentication.md`：Cookie 登录、角色、Fake/生产边界、Oracle 账号替换点（阶段 10）。
+- `docs/authorization-and-data-scope.md`：角色与数据范围、401/403、交集规则、Fake 授权、Oracle 替换点（阶段 11）。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
 - `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。
@@ -100,38 +104,38 @@ curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready 
 # 登录后保存 Cookie，并从响应头读取 X-CSRF-TOKEN 供 logout 使用
 curl -s -c /tmp/fr.cookie -D - -X POST http://localhost:5000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"userName":"viewer","password":"<见测试代码 DevPassword_Viewer>"}'
+  -d '{"userName":"sysadmin","password":"<见测试代码 DevPassword_SystemAdmin>"}'
 curl -s -b /tmp/fr.cookie http://localhost:5000/api/v1/auth/me
 ```
 
-生产日报示例（Fake 夹具日期；本阶段仍可不登录访问）：
+生产日报示例（需先登录；Fake 夹具日期；`factoryId` 仍必填）：
 
 ```bash
-curl -s "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
 ```
 
 工单进度示例：
 
 ```bash
-curl -s "http://localhost:5000/api/v1/reports/work-order-progress?factoryId=1&workOrderCode=WO-DEMO-OVERDUE"
+curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/work-order-progress?factoryId=1&workOrderCode=WO-DEMO-OVERDUE"
 ```
 
 质量统计示例：
 
 ```bash
-curl -s "http://localhost:5000/api/v1/reports/quality-statistics?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/quality-statistics?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
 ```
 
 生产计划达成示例：
 
 ```bash
-curl -s "http://localhost:5000/api/v1/reports/production-plan-achievement?factoryId=1&startDate=2026-03-10&endDate=2026-03-10"
+curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/production-plan-achievement?factoryId=1&startDate=2026-03-10&endDate=2026-03-10"
 ```
 
 月度生产计划示例：
 
 ```bash
-curl -s "http://localhost:5000/api/v1/reports/monthly-production-plan?factoryId=1&planMonth=2026-03"
+curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/monthly-production-plan?factoryId=1&planMonth=2026-03"
 ```
 
 配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token、连接字符串或 Oracle Wallet。

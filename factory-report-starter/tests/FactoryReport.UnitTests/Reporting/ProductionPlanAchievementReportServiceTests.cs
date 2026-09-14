@@ -6,6 +6,7 @@ using FactoryReport.Application.Reporting.ProductionPlanAchievement;
 using FactoryReport.Domain.Common;
 using FactoryReport.Domain.Reporting;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.UnitTests.Security;
 
 namespace FactoryReport.UnitTests.Reporting;
 
@@ -31,7 +32,8 @@ public class ProductionPlanAchievementReportServiceTests
         return new ProductionPlanAchievementReportService(
             query,
             new FakeDataAccessModeProvider(),
-            new FixedClock());
+            new FixedClock(),
+            new PermissiveReportQueryScopeService());
     }
 
     private static ProductionPlanAchievementQueryRequest BaseRequest(

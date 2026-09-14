@@ -13,7 +13,7 @@
   → 失败：统一 401「Invalid username or password.」（不区分用户名不存在 / 密码错误）
   → 成功：SignIn Cookie（HttpOnly；Production 强制 Secure；SameSite=Lax）
   → 响应头附带 X-CSRF-TOKEN（供 logout / 未来写入端点）
-  → 返回当前用户摘要（不含密码、不含细粒度权限明细）
+  → 返回当前用户摘要（不含密码；阶段 11 起含可读 `dataScope` 摘要，非 Cookie Claim）
 
 GET /api/v1/auth/me
   → 已登录：200 + 用户摘要
@@ -43,7 +43,7 @@ Cookie **不得**保存密码或敏感权限明细；仅承载用户标识、显
 | POST | `/api/v1/auth/logout` | 退出；Antiforgery 必填 |
 | GET | `/api/v1/auth/me` | 当前用户；未登录 401 |
 
-现有全部报表只读 API **暂不** `RequireAuthorization`（避免跨阶段改变行为）。策略已注册，后续阶段再挂接。
+阶段 11 起，五张报表只读 API 均 `RequireAuthorization(ReportRead)`，并强制组织数据范围（见 `docs/authorization-and-data-scope.md`）。
 
 ---
 
@@ -58,7 +58,7 @@ Cookie **不得**保存密码或敏感权限明细；仅承载用户标识、显
 | `Viewer` | 只读查看（后续授权） |
 
 策略名称见 `Domain/Security/AuthorizationPolicies`（如 `RequireSystemAdmin`、`CanViewProductionReports`）。  
-组织数据范围强制 **不在本阶段实现**。
+组织数据范围强制见阶段 11 / `docs/authorization-and-data-scope.md`。
 
 规格中另有 `ReportDesigner` / `DataImporter` / `DataPublisher` 等角色，本阶段未启用。
 
@@ -99,7 +99,7 @@ Fake 账号全部 `IsTestOnlyAccount=true`，**不得当作正式生产账号**�
 - [ ] 账号创建、停用、重置流程【待后续阶段】
 - [ ] 登录失败限流与临时锁定【待后续阶段】
 - [ ] 审计日志字段与保留【待后续阶段】
-- [ ] 组织数据范围强制【后续阶段】
+- [x] 组织数据范围强制（阶段 11；正式分配 UI 仍待后续）
 - [ ] 用户管理 UI【后续阶段】
 - [ ] ASP.NET Core Identity 与 Oracle 表结构【待现场确认】
 

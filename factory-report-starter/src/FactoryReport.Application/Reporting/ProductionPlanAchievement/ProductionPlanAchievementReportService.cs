@@ -1,6 +1,7 @@
 using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Common;
 using FactoryReport.Application.DataAccess;
+using FactoryReport.Application.Security.DataScope;
 using FactoryReport.Domain.Planning;
 using FactoryReport.Domain.Production;
 using FactoryReport.Domain.Reporting;
@@ -24,16 +25,19 @@ public sealed class ProductionPlanAchievementReportService : IProductionPlanAchi
     private readonly IDataAccessModeProvider _dataAccessModeProvider;
     private readonly IUtcClock _clock;
     private readonly PlanAchievementEvaluator _evaluator;
+    private readonly IReportQueryScopeService _queryScopeService;
 
     public ProductionPlanAchievementReportService(
         IReportDataQueryService queryService,
         IDataAccessModeProvider dataAccessModeProvider,
         IUtcClock clock,
+        IReportQueryScopeService queryScopeService,
         PlanAchievementEvaluator? evaluator = null)
     {
         _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
         _dataAccessModeProvider = dataAccessModeProvider ?? throw new ArgumentNullException(nameof(dataAccessModeProvider));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _queryScopeService = queryScopeService ?? throw new ArgumentNullException(nameof(queryScopeService));
         _evaluator = evaluator ?? new PlanAchievementEvaluator();
     }
 
@@ -44,10 +48,13 @@ public sealed class ProductionPlanAchievementReportService : IProductionPlanAchi
         ArgumentNullException.ThrowIfNull(request);
         var validated = Validate(request);
 
-        var scope = new OrganizationScopeFilter(
-            validated.FactoryId,
-            validated.WorkshopId,
-            validated.ProductionLineId);
+        var scope = await _queryScopeService
+            .ResolveEffectiveOrganizationScopeAsync(
+                validated.FactoryId,
+                validated.WorkshopId,
+                validated.ProductionLineId,
+                cancellationToken)
+            .ConfigureAwait(false);
         var dateRange = new DateRangeFilter(validated.StartDate, validated.EndDate);
 
         var recordsTask = _queryService.GetProductionRecordsAsync(

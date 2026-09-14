@@ -139,4 +139,6 @@ Application 层：`StableReportCodes`、`PlanAchievementEvaluator`、`IUtcClock`
 阶段 7 已基于 Fake 实现质量统计查询 API（见 `docs/api-quality-statistics.md`）。  
 阶段 8 已基于 Fake 实现生产计划达成查询 API（见 `docs/api-production-plan-achievement.md`）。  
 阶段 9 已基于 Fake 实现月度生产计划查询 API（见 `docs/api-monthly-production-plan.md`）。  
-下一步建议：进入权限与组织范围强制，或报表页面；Excel 导入/发布/回退与 Oracle 映射仍为后续独立阶段。
+阶段 10 已实现本地账号 Cookie 认证（见 `docs/authentication.md`）。  
+阶段 11 已强制报表授权与组织数据范围（见 `docs/authorization-and-data-scope.md`）。  
+下一步建议：用户管理与正式权限分配，或报表页面；Excel 导入/发布/回退与 Oracle 映射仍为后续独立阶段。

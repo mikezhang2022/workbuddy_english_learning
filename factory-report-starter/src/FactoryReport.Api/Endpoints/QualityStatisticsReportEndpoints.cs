@@ -1,4 +1,5 @@
 using FactoryReport.Application.Reporting.QualityStatistics;
+using FactoryReport.Domain.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +26,10 @@ public static class QualityStatisticsReportEndpoints
                 "『Fake 测试口径，现场 MES 接入前须确认』。只读，无写入。" +
                 "不支持 workOrderCode：ProductionRecord 无工单维度。")
             .Produces<QualityStatisticsQueryResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .RequireAuthorization(AuthorizationPolicies.ReportRead);
 
         return app;
     }

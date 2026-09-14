@@ -1,4 +1,5 @@
 using FactoryReport.Application.Reporting.ProductionDaily;
+using FactoryReport.Domain.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,7 +23,10 @@ public static class ProductionDailyReportEndpoints
                 "InspectionQuantity 为 0 时 YieldRate 为 null。" +
                 "『Fake 测试口径，现场 MES 接入前须确认』。只读，无写入。")
             .Produces<ProductionDailyQueryResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .RequireAuthorization(AuthorizationPolicies.ReportRead);
 
         return app;
     }

@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 namespace FactoryReport.Api.Security;
 
 /// <summary>
-/// Cookie 认证、Antiforgery 与授权策略注册（阶段 10）。
-/// 现有报表 API 暂不 RequireAuthorization。
+/// Cookie 认证、Antiforgery 与授权策略注册（阶段 10/11）。
+/// 报表 API 使用 <see cref="AuthorizationPolicies.ReportRead"/>。
 /// </summary>
 public static class FactoryReportAuthDefaults
 {
@@ -81,6 +81,16 @@ public static class FactoryReportAuthenticationExtensions
             options.AddPolicy(
                 AuthorizationPolicies.RequireViewer,
                 policy => policy.RequireRole(AppRoles.Viewer));
+
+            // 阶段 11：五个角色均可 ReportRead；角色×报表细粒度矩阵【待后续确认】。
+            options.AddPolicy(
+                AuthorizationPolicies.ReportRead,
+                policy => policy.RequireRole(
+                    AppRoles.SystemAdmin,
+                    AppRoles.FactoryAdmin,
+                    AppRoles.ProductionManager,
+                    AppRoles.QualityUser,
+                    AppRoles.Viewer));
 
             options.AddPolicy(
                 AuthorizationPolicies.CanViewProductionReports,

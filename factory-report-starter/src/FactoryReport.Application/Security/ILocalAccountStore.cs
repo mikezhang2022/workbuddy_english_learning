@@ -21,4 +21,9 @@ public interface ILocalAccountStore
     /// 按用户名查找账号；不存在返回 null。查找本身不区分「用户不存在 / 密码错误」对外语义。
     /// </summary>
     Task<LocalAccount?> FindByUserNameAsync(string userName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 按用户 Id 查找账号（用于服务端数据范围解析）。不存在返回 null。
+    /// </summary>
+    Task<LocalAccount?> FindByUserIdAsync(string userId, CancellationToken cancellationToken = default);
 }

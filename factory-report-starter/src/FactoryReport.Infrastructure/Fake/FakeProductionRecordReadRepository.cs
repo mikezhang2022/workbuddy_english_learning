@@ -33,10 +33,18 @@ public sealed class FakeProductionRecordReadRepository : IProductionRecordReadRe
         {
             query = query.Where(r => r.WorkshopId == scope.WorkshopId.Value);
         }
+        else if (scope.AuthorizedWorkshopIds is { Count: > 0 } workshops)
+        {
+            query = query.Where(r => workshops.Contains(r.WorkshopId));
+        }
 
         if (scope.ProductionLineId is not null)
         {
             query = query.Where(r => r.ProductionLineId == scope.ProductionLineId.Value);
+        }
+        else if (scope.AuthorizedProductionLineIds is { Count: > 0 } lines)
+        {
+            query = query.Where(r => lines.Contains(r.ProductionLineId));
         }
 
         if (!string.IsNullOrWhiteSpace(productCode))

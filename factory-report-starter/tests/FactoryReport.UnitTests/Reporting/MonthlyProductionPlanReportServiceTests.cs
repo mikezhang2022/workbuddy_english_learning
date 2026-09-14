@@ -5,6 +5,7 @@ using FactoryReport.Application.Reporting.MonthlyProductionPlan;
 using FactoryReport.Domain.Common;
 using FactoryReport.Domain.Import;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.UnitTests.Security;
 
 namespace FactoryReport.UnitTests.Reporting;
 
@@ -30,7 +31,8 @@ public class MonthlyProductionPlanReportServiceTests
         return new MonthlyProductionPlanReportService(
             query,
             new FakeDataAccessModeProvider(),
-            new FixedClock());
+            new FixedClock(),
+            new PermissiveReportQueryScopeService());
     }
 
     private static MonthlyProductionPlanQueryRequest BaseRequest(

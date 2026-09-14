@@ -6,11 +6,13 @@ namespace FactoryReport.IntegrationTests;
 
 public class ProductionPlanAchievementReportApiTests : IClassFixture<ApiWebApplicationFactory>
 {
+    private readonly ApiWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
     public ProductionPlanAchievementReportApiTests(ApiWebApplicationFactory factory)
     {
-        _client = factory.CreateClient();
+        _factory = factory;
+        _client = AuthenticatedClientFactory.CreateSystemAdminClientAsync(factory).GetAwaiter().GetResult();
     }
 
     private static string BuildUrl(

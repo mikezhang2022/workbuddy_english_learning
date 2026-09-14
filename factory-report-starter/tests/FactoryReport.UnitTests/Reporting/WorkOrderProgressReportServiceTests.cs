@@ -4,6 +4,7 @@ using FactoryReport.Application.DataAccess;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
 using FactoryReport.Domain.Common;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.UnitTests.Security;
 
 namespace FactoryReport.UnitTests.Reporting;
 
@@ -32,7 +33,8 @@ public class WorkOrderProgressReportServiceTests
         return new WorkOrderProgressReportService(
             query,
             new FakeDataAccessModeProvider(),
-            new FixedClock(comparedAt ?? DeterministicFakeFixture.FakeComparedAtUtc));
+            new FixedClock(comparedAt ?? DeterministicFakeFixture.FakeComparedAtUtc),
+            new PermissiveReportQueryScopeService());
     }
 
     private static WorkOrderProgressQueryRequest BaseRequest(

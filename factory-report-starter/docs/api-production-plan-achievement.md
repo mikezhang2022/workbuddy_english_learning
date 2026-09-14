@@ -13,7 +13,7 @@
 |---|---|
 | 方法 | `GET` |
 | 路径 | `/api/v1/reports/production-plan-achievement` |
-| 认证 | 本阶段未启用（后续权限阶段） |
+| 认证 | **需要登录**（`ReportRead`）；Cookie 会话。未登录 → 401；组织范围越权 → 403。详见 `docs/authorization-and-data-scope.md` |
 | 写入 | **无**；本阶段不提供任何 POST/PUT/PATCH/DELETE |
 
 OpenAPI：Development / Testing 环境可通过 `GET /openapi/v1.json` 查看（`MapOpenApi`）。
@@ -24,7 +24,7 @@ OpenAPI：Development / Testing 环境可通过 `GET /openapi/v1.json` 查看（
 
 | 参数 | 类型 | 必填 | 语义 |
 |---|---|---|---|
-| `factoryId` | long | **是** | 工厂 ID；正整数。缺失或 ≤0 → 400 ProblemDetails |
+| `factoryId` | long | **是**（登录后仍必填；不得省略以扩大范围） | 工厂 ID；正整数。缺失或 ≤0 → 400 ProblemDetails |
 | `startDate` | date (`yyyy-MM-dd`) | **是** | 生产日起始日（`DateOnly`，闭区间） |
 | `endDate` | date (`yyyy-MM-dd`) | **是** | 生产日结束日（`DateOnly`，闭区间）；不得早于 `startDate` |
 | `workshopId` | long | 否 | 车间 ID；若提供须为正整数 |
@@ -155,6 +155,8 @@ X-Correlation-ID: demo-ppa-001
 | 未知 `factoryId`（夹具中不存在） | `200` + 空 `rows`（不串其他工厂） |
 | 筛选导致无匹配 | `200` + 空 `rows` |
 | 跨工厂 | 强制按 `factoryId` 过滤；不同工厂互不串数据 |
+| 未登录 | `401` ProblemDetails |
+| 组织范围越权 | `403` ProblemDetails |
 | 未处理异常 | `500` ProblemDetails + `correlationId` |
 
 ProblemDetails 含 `correlationId` / `traceId`；请求头可传 `X-Correlation-ID`。

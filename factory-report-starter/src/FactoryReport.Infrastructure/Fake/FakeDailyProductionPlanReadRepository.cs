@@ -33,10 +33,18 @@ public sealed class FakeDailyProductionPlanReadRepository : IDailyProductionPlan
         {
             query = query.Where(p => p.WorkshopId == scope.WorkshopId.Value);
         }
+        else if (scope.AuthorizedWorkshopIds is { Count: > 0 } workshops)
+        {
+            query = query.Where(p => workshops.Contains(p.WorkshopId));
+        }
 
         if (scope.ProductionLineId is not null)
         {
             query = query.Where(p => p.ProductionLineId == scope.ProductionLineId.Value);
+        }
+        else if (scope.AuthorizedProductionLineIds is { Count: > 0 } lines)
+        {
+            query = query.Where(p => p.ProductionLineId is not null && lines.Contains(p.ProductionLineId.Value));
         }
 
         if (!string.IsNullOrWhiteSpace(productCode))

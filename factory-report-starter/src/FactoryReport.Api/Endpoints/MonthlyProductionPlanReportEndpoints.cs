@@ -1,4 +1,5 @@
 using FactoryReport.Application.Reporting.MonthlyProductionPlan;
+using FactoryReport.Domain.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,7 +23,10 @@ public static class MonthlyProductionPlanReportEndpoints
                 "Fake 版本行为：仅返回 Published 且 Active 的计划版本；" +
                 "真实 Excel 发布/激活/回退【待现场确认】。只读，无写入。")
             .Produces<MonthlyProductionPlanQueryResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .RequireAuthorization(AuthorizationPolicies.ReportRead);
 
         return app;
     }

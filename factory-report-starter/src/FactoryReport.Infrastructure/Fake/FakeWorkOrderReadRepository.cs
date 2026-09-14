@@ -28,10 +28,18 @@ public sealed class FakeWorkOrderReadRepository : IWorkOrderReadRepository
         {
             query = query.Where(w => w.WorkshopId == scope.WorkshopId);
         }
+        else if (scope.AuthorizedWorkshopIds is { Count: > 0 } workshops)
+        {
+            query = query.Where(w => w.WorkshopId is not null && workshops.Contains(w.WorkshopId.Value));
+        }
 
         if (scope.ProductionLineId is not null)
         {
             query = query.Where(w => w.ProductionLineId == scope.ProductionLineId);
+        }
+        else if (scope.AuthorizedProductionLineIds is { Count: > 0 } lines)
+        {
+            query = query.Where(w => w.ProductionLineId is not null && lines.Contains(w.ProductionLineId.Value));
         }
 
         if (!string.IsNullOrWhiteSpace(productCode))

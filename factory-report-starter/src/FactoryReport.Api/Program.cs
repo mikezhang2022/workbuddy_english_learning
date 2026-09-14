@@ -55,10 +55,10 @@ if (!app.Environment.IsEnvironment("Testing"))
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 认证能力（阶段 10）。现有报表 API 暂不强制 RequireAuthorization。
+// 认证能力（阶段 10）。报表 API（阶段 11）RequireAuthorization(ReportRead) + 数据范围强制。
 app.MapAuthEndpoints();
 
-// 只读报表 API（阶段 5/6/7/8/9）：生产日报、工单进度、质量统计、计划达成、月度生产计划。无写入端点。
+// 只读报表 API（阶段 5/6/7/8/9 + 11 授权）：生产日报、工单进度、质量统计、计划达成、月度生产计划。无写入端点。
 app.MapProductionDailyReportEndpoints();
 app.MapWorkOrderProgressReportEndpoints();
 app.MapQualityStatisticsReportEndpoints();
@@ -76,19 +76,20 @@ app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataSto
         utc = DateTime.UtcNow
     });
 })
-.WithName("Health");
+.WithName("Health")
+.AllowAnonymous();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("live"),
     ResponseWriter = WriteHealthResponseAsync
-});
+}).AllowAnonymous();
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
     ResponseWriter = WriteHealthResponseAsync
-});
+}).AllowAnonymous();
 
 var options = app.Services.GetRequiredService<IOptions<FactoryReportOptions>>().Value;
 if (options.ExposeTestExceptionEndpoint
