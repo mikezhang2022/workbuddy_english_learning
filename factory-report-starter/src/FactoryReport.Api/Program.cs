@@ -14,6 +14,24 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var mobileClientOrigins = builder.Configuration
+    .GetSection(FactoryReportOptions.SectionName)
+    .Get<FactoryReportOptions>()?.MobileClientAllowedOrigins ?? [];
+
+if (mobileClientOrigins.Length > 0)
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy(
+            "MobilePwaClient",
+            policy => policy
+                .WithOrigins(mobileClientOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+    });
+}
+
 builder.ConfigureOperationalLogging();
 
 builder.Services.AddOpenApi();
@@ -50,6 +68,11 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 if (!app.Environment.IsEnvironment("Testing"))
 {
     app.UseHttpsRedirection();
+}
+
+if (mobileClientOrigins.Length > 0)
+{
+    app.UseCors("MobilePwaClient");
 }
 
 app.UseAuthentication();

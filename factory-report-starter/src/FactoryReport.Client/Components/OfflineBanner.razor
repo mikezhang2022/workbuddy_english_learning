@@ -1,0 +1,23 @@
+@implements IDisposable
+@inject IOnlineStatusService OnlineStatus
+
+@if (!OnlineStatus.IsOnline)
+{
+    <MudAlert Severity="Severity.Warning" Class="offline-banner" Dense="true" aria-live="polite">
+        @ApiConstants.OfflineDataMessage
+    </MudAlert>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        OnlineStatus.ConnectivityChanged += OnConnectivityChanged;
+    }
+
+    private void OnConnectivityChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        OnlineStatus.ConnectivityChanged -= OnConnectivityChanged;
+    }
+}

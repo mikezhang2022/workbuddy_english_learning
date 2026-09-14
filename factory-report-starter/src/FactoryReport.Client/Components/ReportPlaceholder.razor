@@ -1,0 +1,23 @@
+@inject IOnlineStatusService OnlineStatus
+
+<MudPaper Class="report-placeholder pa-4" Outlined="true">
+    <MudText Typo="Typo.h6" GutterBottom="true">@Title</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">@Description</MudText>
+    <MudAlert Severity="Severity.Info" Dense="true">
+        报表数据页面即将接入；本阶段仅提供导航与认证框架。
+    </MudAlert>
+    @if (!OnlineStatus.IsOnline)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+            @ApiConstants.OfflineDataMessage
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = "";
+
+    [Parameter]
+    public string Description { get; set; } = "联网后从服务端 API 获取最新数据。";
+}

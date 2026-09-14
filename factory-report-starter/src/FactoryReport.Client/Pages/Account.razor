@@ -1,0 +1,57 @@
+@page "/account"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IAuthSessionService AuthSession
+@inject NavigationManager Navigation
+
+<PageTitle>我的账号 - 工厂报表</PageTitle>
+
+<h1 class="visually-hidden">我的账号</h1>
+
+<MudText Typo="Typo.h6" GutterBottom="true">我的账号</MudText>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.body1">@AuthSession.CurrentUser?.DisplayName</MudText>
+    <MudText Typo="Typo.body2">@AuthSession.CurrentUser?.UserName</MudText>
+    <MudDivider Class="my-3" />
+    @foreach (var line in DataScopeDisplayFormatter.FormatSummaryLines(AuthSession.CurrentUser?.DataScope))
+    {
+        <MudText Typo="Typo.body2">@line</MudText>
+    }
+</MudPaper>
+
+<MudButton Variant="Variant.Outlined"
+           Color="Color.Error"
+           FullWidth="true"
+           Disabled="_busy"
+           OnClick="LogoutAsync">
+    @(_busy ? "退出中…" : "退出登录")
+</MudButton>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+}
+
+@code {
+    private bool _busy;
+    private string? _error;
+
+    private async Task LogoutAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await AuthSession.LogoutAsync();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+        catch (ApiRequestException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

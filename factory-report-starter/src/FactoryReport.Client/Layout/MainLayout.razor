@@ -1,16 +1,24 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject IAuthSessionService AuthSession
 
-    <main>
-        <div class="top-row px-4">
-            <span>开发中 / Fake 模式</span>
-        </div>
+<MudLayout Class="app-shell">
+    <MudAppBar Elevation="1" Dense="true" Class="app-top-bar">
+        <MudText Typo="Typo.h6">工厂报表</MudText>
+        <MudSpacer />
+        @if (AuthSession.CurrentUser is not null)
+        {
+            <MudText Typo="Typo.body2" Class="d-none d-sm-inline user-chip">
+                @AuthSession.CurrentUser.DisplayName
+            </MudText>
+        }
+    </MudAppBar>
 
-        <article class="content px-4">
+    <MudMainContent Class="app-main">
+        <OfflineBanner />
+        <div class="app-content">
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </MudMainContent>
+
+    <MobileBottomNav />
+</MudLayout>

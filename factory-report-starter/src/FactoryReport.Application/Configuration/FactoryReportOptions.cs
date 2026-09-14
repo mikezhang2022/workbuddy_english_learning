@@ -26,6 +26,11 @@ public sealed class FactoryReportOptions
     /// 本地账号认证配置（阶段 10）。默认 Fake；Production 不得启用 Fake。
     /// </summary>
     public AuthenticationOptions Authentication { get; set; } = new();
+
+    /// <summary>
+    /// 移动 PWA 客户端源（CORS，含凭据）。示例仅 localhost；现场由反向代理或配置注入。
+    /// </summary>
+    public string[] MobileClientAllowedOrigins { get; set; } = [];
 }
 
 /// <summary>

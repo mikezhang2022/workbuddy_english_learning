@@ -1,10 +1,5 @@
-﻿@page "/"
+﻿@page "/home-legacy"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
-<PageTitle>Factory Report — 客户端</PageTitle>
-
-<section class="shell">
-    <p class="badge">开发中 / Fake 模式</p>
-    <h1>Factory Report</h1>
-    <p class="lead">工厂局域网移动报表客户端（Blazor WebAssembly PWA）空壳。</p>
-    <p class="note">当前为阶段 1 解决方案骨架。未接入登录、权限、Oracle、MES 或报表业务。</p>
-</section>
+<PageTitle>工厂报表</PageTitle>
+<MudText>请访问 <MudLink Href="/">概览</MudLink>。</MudText>

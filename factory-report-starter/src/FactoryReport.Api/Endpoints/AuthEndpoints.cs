@@ -42,6 +42,13 @@ public static class AuthEndpoints
             .Produces<AuthMeResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/csrf", CsrfAsync)
+            .WithName("AuthCsrf")
+            .WithSummary("为已登录会话签发 Antiforgery 请求令牌（响应头 X-CSRF-TOKEN）")
+            .AllowAnonymous()
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
         return app;
     }
 
@@ -170,6 +177,26 @@ public static class AuthEndpoints
             .ConfigureAwait(false);
 
         return Results.Ok(AuthMeResponse.From(user, DataScopeSummary.From(scope)));
+    }
+
+    private static IResult CsrfAsync(HttpContext httpContext, IAntiforgery antiforgery)
+    {
+        if (httpContext.User?.Identity?.IsAuthenticated != true)
+        {
+            return Results.Problem(
+                detail: "Not authenticated.",
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Unauthorized");
+        }
+
+        var tokens = antiforgery.GetAndStoreTokens(httpContext);
+        if (!string.IsNullOrEmpty(tokens.RequestToken))
+        {
+            httpContext.Response.Headers[FactoryReportAuthDefaults.AntiforgeryHeaderName] =
+                tokens.RequestToken;
+        }
+
+        return Results.NoContent();
     }
 
     private static IResult UnauthorizedLogin()

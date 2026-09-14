@@ -1,0 +1,36 @@
+@page "/"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IAuthSessionService AuthSession
+@inject IOnlineStatusService OnlineStatus
+
+<PageTitle>概览 - 工厂报表</PageTitle>
+
+<h1 class="visually-hidden">概览</h1>
+
+<MudText Typo="Typo.h6" GutterBottom="true">欢迎，@(AuthSession.CurrentUser?.DisplayName ?? "用户")</MudText>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.subtitle2">当前账号</MudText>
+    <MudText Typo="Typo.body2">@AuthSession.CurrentUser?.UserName</MudText>
+    @if (AuthSession.CurrentUser?.Roles is { Count: > 0 } roles)
+    {
+        <MudText Typo="Typo.caption" Class="mt-2">角色：@string.Join("、", roles)</MudText>
+    }
+    <MudDivider Class="my-3" />
+    <MudText Typo="Typo.subtitle2">数据范围（服务端授权摘要）</MudText>
+    @foreach (var line in DataScopeDisplayFormatter.FormatSummaryLines(AuthSession.CurrentUser?.DataScope))
+    {
+        <MudText Typo="Typo.body2">@line</MudText>
+    }
+</MudPaper>
+
+@if (!OnlineStatus.IsOnline)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-3">
+        @ApiConstants.OfflineDataMessage
+    </MudAlert>
+}
+
+<MudText Typo="Typo.body2">
+    请使用底部导航进入各报表模块。报表数据需联网从 API 获取，离线不会展示过期数据为实时结果。
+</MudText>

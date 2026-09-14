@@ -1,0 +1,118 @@
+@page "/login"
+@layout LoginLayout
+@using FactoryReport.Client.Services.Api
+@inject IAuthSessionService AuthSession
+@inject NavigationManager Navigation
+
+<PageTitle>登录 - 工厂报表</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="login-container">
+    <MudPaper Class="pa-6 login-card" Elevation="4">
+        <MudText Typo="Typo.h5" Align="Align.Center" GutterBottom="true">工厂报表</MudText>
+        <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-4">请使用工厂账号登录</MudText>
+
+        <EditForm Model="_model" OnValidSubmit="SubmitAsync">
+            <MudTextField @bind-Value="_model.UserName"
+                          Label="用户名"
+                          InputType="InputType.Text"
+                          Required="true"
+                          RequiredError="请输入用户名"
+                          InputAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "username" })"
+                          Immediate="true"
+                          Class="mb-3" />
+            <MudTextField @bind-Value="_model.Password"
+                          Label="密码"
+                          InputType="InputType.Password"
+                          Required="true"
+                          RequiredError="请输入密码"
+                          InputAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "current-password" })"
+                          Class="mb-3" />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" aria-live="assertive">@_error</MudAlert>
+            }
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Disabled="_busy">
+                @(_busy ? "登录中…" : "登录")
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private readonly LoginFormModel _model = new();
+    private bool _busy;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (AuthSession.CurrentUser is not null)
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await AuthSession.LoginAsync(_model.UserName.Trim(), _model.Password);
+            _model.Password = string.Empty;
+            Navigation.NavigateTo(ResolveReturnUrl(), replace: true);
+        }
+        catch (ApiRequestException ex)
+        {
+            _error = ex.Problem.Status == 401
+                ? ApiConstants.LoginInvalidCredentialsMessage
+                : ex.Message;
+            if (!string.IsNullOrWhiteSpace(ex.Problem.CorrelationId))
+            {
+                _error += $"（参考编号：{ex.Problem.CorrelationId}）";
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string ResolveReturnUrl()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (string.IsNullOrEmpty(uri.Query))
+        {
+            return "/";
+        }
+
+        foreach (var segment in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!segment.StartsWith("returnUrl=", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var value = Uri.UnescapeDataString(segment["returnUrl=".Length..]);
+            if (string.IsNullOrWhiteSpace(value) || value.StartsWith("//", StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            return value.StartsWith('/') ? value : "/" + value;
+        }
+
+        return "/";
+    }
+
+    private sealed class LoginFormModel
+    {
+        public string UserName { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}

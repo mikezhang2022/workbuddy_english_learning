@@ -1,9 +1,11 @@
 {
-  "name": "Factory Report",
-  "short_name": "FactoryReport",
+  "name": "工厂报表",
+  "short_name": "工厂报表",
+  "description": "工厂局域网移动报表 PWA（离线仅应用壳，数据需联网）",
   "id": "./",
   "start_url": "./",
   "display": "standalone",
+  "lang": "zh-CN",
   "background_color": "#ffffff",
   "theme_color": "#1f3a4d",
   "prefer_related_applications": false,
@@ -11,12 +13,14 @@
     {
       "src": "icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
     },
     {
       "src": "icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     }
   ]
 }

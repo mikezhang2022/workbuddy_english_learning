@@ -4,9 +4,11 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 11 完成）
+## 当前状态（阶段 12 完成）
 
-已实现 **报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 的 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
+已实现 **移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航与各报表「即将接入」占位。报表数据页面与用户管理仍为后续阶段。
+
+阶段 11：**报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
 
 - 默认 **Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。
 - **认证 API**（见 `docs/authentication.md`）：
@@ -25,9 +27,11 @@
   - `GET /api/v1/reports/monthly-production-plan`
 - Cookie：HttpOnly；Production 强制 Secure；SameSite=Lax；不存密码/权限明细。
 - Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
-- **本阶段不包含** 用户管理 UI、正式权限分配、角色×报表细粒度矩阵、Oracle 账号持久化、Excel 写入、MES 同步、报表页面。
+- **移动 PWA**（见 `docs/mobile-pwa.md`）：Manifest + Service Worker 应用壳；不缓存 `/api`；离线提示「数据需联网获取」。
+- **Client 运行**：先启动 API，再 `dotnet run --project src/FactoryReport.Client`；`wwwroot/appsettings.json` 配置 `FactoryReportClient:ApiBaseUrl`（示例为 localhost，不含内网机密）。
+- **本阶段 Client 不包含** 具体报表数据页、用户管理 UI；**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入、MES 同步（除非另行实现）。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
-- Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
+- Admin 仍为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
 - 领域说明见 `docs/domain-model.md`；夹具说明见 `docs/fake-data.md`。
 
@@ -48,6 +52,7 @@
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
 - `docs/authentication.md`：Cookie 登录、角色、Fake/生产边界、Oracle 账号替换点（阶段 10）。
 - `docs/authorization-and-data-scope.md`：角色与数据范围、401/403、交集规则、Fake 授权、Oracle 替换点（阶段 11）。
+- `docs/mobile-pwa.md`：PWA 登录流程、离线/缓存边界、本地运行方式（阶段 12）。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
 - `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。
@@ -86,6 +91,8 @@ dotnet run --project src/FactoryReport.Worker
 dotnet run --project src/FactoryReport.Admin
 dotnet run --project src/FactoryReport.Client
 ```
+
+移动 PWA 需 API 与 Client 同时运行，且 Development 下 API 的 `FactoryReport:MobileClientAllowedOrigins` 需包含 Client 源（见 `appsettings.Development.json`）。详见 `docs/mobile-pwa.md`。
 
 验证健康检查（另开终端）：
 

@@ -89,6 +89,30 @@ public class AuthApiTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Csrf_WhenAuthenticated_ReturnsTokenHeader()
+    {
+        var client = CreateCookieClient();
+        var login = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest
+        {
+            UserName = "viewer",
+            Password = FakeLocalAccountStore.DevPassword_Viewer
+        });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        var csrfResponse = await client.GetAsync("/api/v1/auth/csrf");
+        Assert.Equal(HttpStatusCode.NoContent, csrfResponse.StatusCode);
+        Assert.True(csrfResponse.Headers.Contains(FactoryReportAuthDefaults.AntiforgeryHeaderName));
+    }
+
+    [Fact]
+    public async Task Csrf_WhenAnonymous_ReturnsUnauthorized()
+    {
+        var client = CreateCookieClient();
+        var response = await client.GetAsync("/api/v1/auth/csrf");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Logout_InvalidatesSession()
     {
         var client = CreateCookieClient();

@@ -38,6 +38,12 @@ async function onActivate(event) {
 }
 
 async function onFetch(event) {
+    const requestUrl = new URL(event.request.url);
+    // 不缓存 API、认证 Cookie 相关请求或任何跨源数据响应。
+    if (requestUrl.pathname.startsWith('/api/')) {
+        return fetch(event.request);
+    }
+
     let cachedResponse = null;
     if (event.request.method === 'GET') {
         // For all navigation requests, try to serve index.html from cache,

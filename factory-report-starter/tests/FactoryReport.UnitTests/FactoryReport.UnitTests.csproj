@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\FactoryReport.Domain\FactoryReport.Domain.csproj" />
     <ProjectReference Include="..\..\src\FactoryReport.Application\FactoryReport.Application.csproj" />
     <ProjectReference Include="..\..\src\FactoryReport.Infrastructure\FactoryReport.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FactoryReport.Client\FactoryReport.Client.csproj" />
   </ItemGroup>
 
 </Project>
