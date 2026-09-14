@@ -4,9 +4,13 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 17 完成）
+## 当前状态（阶段 18 完成）
 
-已实现 **月度生产计划移动端查询页**（`/reports/monthly-production-plan`）：接入 `GET /api/v1/reports/monthly-production-plan`，按 `/me` 数据范围筛选，必填 `PlanMonth`（yyyy-MM），展示 meta / 激活版本 / 原始日计划行（禁止前端月均摊），处理 401/403/离线。详见 `docs/ui-monthly-production-plan.md`。
+阶段 18：**Oracle 现场接入准备与持久化设计（纯文档）**。新增接入计划、应用 Schema 逻辑设计、现场问卷；**不连接 Oracle、不实现持久化、不改业务 API**。详见 `docs/oracle-integration-plan.md`、`docs/oracle-schema-design.md`、`docs/oracle-site-questionnaire.md`。
+
+**现阶段仍只运行 Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。真实 Oracle 接入必须在工厂现场完成；连接信息通过 **环境变量 / ASP.NET Core 配置与 Secret（密钥管理）** 注入，**不得进入 Git**（禁止提交连接串、密码、Wallet、证书私钥）。
+
+阶段 17：**月度生产计划移动端查询页**（`/reports/monthly-production-plan`）。详见 `docs/ui-monthly-production-plan.md`。
 
 **五张报表移动端页面全部完成**（生产日报、工单进度、质量统计、计划达成、月度生产计划）。
 
@@ -20,9 +24,9 @@
 
 阶段 12：**移动 PWA 登录与应用壳**（`FactoryReport.Client`）：Cookie 会话、登录/退出、`/me` 与 dataScope 摘要展示、底部导航。
 
-阶段 11：**报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 Cookie 认证保留；五张只读报表 API 均需登录，并按授权范围求交。
+阶段 11：**报表授权与组织数据范围强制**（Fake 内存账号 + 服务端范围配置）。阶段 10 Cookie 认证保留；五张报表 API 均需登录，并按授权范围求交。
 
-- 默认 **Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。
+- 默认 **Fake 模式**（`FactoryReport:DataMode=Fake`；Infrastructure 当前仍强制 Fake 仓储，避免误连）。
 - **认证 API**（见 `docs/authentication.md`）：
   - `POST /api/v1/auth/login`
   - `POST /api/v1/auth/logout`（Antiforgery）
@@ -41,8 +45,8 @@
 - Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
 - **移动 PWA**（见 `docs/mobile-pwa.md`）：Manifest + Service Worker 应用壳；不缓存 `/api`；离线提示「数据需联网获取」。
 - **Client 运行**：先启动 API，再 `dotnet run --project src/FactoryReport.Client`；`wwwroot/appsettings.json` 配置 `FactoryReportClient:ApiBaseUrl`（示例为 localhost，不含内网机密）。
-- **Client 已含** 五张报表数据页（生产日报、工单进度、质量统计、计划达成、月度生产计划）；用户管理 UI 仍为后续阶段。**服务端后续阶段仍不包含** 正式权限分配 UI、Oracle 账号持久化、Excel 写入/发布/激活、MES 同步（除非另行实现）。
-- 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
+- **Client 已含** 五张报表数据页（生产日报、工单进度、质量统计、计划达成、月度生产计划）；用户管理 UI 仍为后续阶段。**服务端后续仍不包含**（除非现场问卷完成并另开实现阶段）：正式权限分配 UI、Oracle 账号持久化、Excel 写入/发布/激活、MES 同步。
+- 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**；阶段 18 仅有逻辑设计文档，无 DDL。
 - Admin 仍为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
 - 领域说明见 `docs/domain-model.md`；夹具说明见 `docs/fake-data.md`。
@@ -51,7 +55,8 @@
 
 - 本地报表库与 MES/ERP 只读源均按 **Oracle** 方案设计与实现。
 - 使用 Oracle 官方 .NET 驱动（**Oracle.ManagedDataAccess / ODP.NET**）与 EF Core Oracle Provider（**Oracle.EntityFrameworkCore**）。
-- Oracle 版本、Schema 名称、字符集、连接方式、现场只读视图均为 **【待现场确认】**。
+- Oracle 版本、Schema 名称、字符集、连接方式、现场只读视图均为 **【待现场确认】**（问卷：`docs/oracle-site-questionnaire.md`）。
+- **当前运行时仅 Fake**：真实接入须在现场完成；凭据用环境变量 / Secret 管理，**连接信息不得进入 Git**。
 - 禁止新增任何 SQL Server 专用代码、脚本或配置。
 - Cursor Cloud / 模拟开发使用 Fake 内存或文件数据，**不得连接数据库**（含 Oracle）。
 
@@ -61,6 +66,9 @@
 - `FactoryReport_Cursor_Prompts.md`：Cursor Cloud 分阶段提示词。
 - `AGENTS.md`：所有代码代理必须遵守的项目规则。
 - `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
+- `docs/oracle-integration-plan.md`：Oracle 现场接入计划、权限边界、数据归属、Fake→Oracle→MES Reader 替换点（阶段 18）。
+- `docs/oracle-schema-design.md`：应用 Schema 逻辑表设计（无 DDL）；计划唯一键/Active 等【待产品确认】（阶段 18）。
+- `docs/oracle-site-questionnaire.md`：现场最小信息问卷（不含密码/Wallet/真实连接串）（阶段 18）。
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
 - `docs/authentication.md`：Cookie 登录、角色、Fake/生产边界、Oracle 账号替换点（阶段 10）。
 - `docs/authorization-and-data-scope.md`：角色与数据范围、401/403、交集规则、Fake 授权、Oracle 替换点（阶段 11）。

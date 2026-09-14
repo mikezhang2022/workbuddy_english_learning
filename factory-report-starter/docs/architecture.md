@@ -76,13 +76,16 @@ Tests          -> 被测项目
 
 `src/FactoryReport.Infrastructure/Persistence/Oracle/`
 
-后续在此实现（本阶段仅为占位）：
+阶段 18 已完成**设计文档**（无实现）：`docs/oracle-integration-plan.md`、`docs/oracle-schema-design.md`、`docs/oracle-site-questionnaire.md`。
 
-1. EF Core `DbContext`（`Oracle.EntityFrameworkCore`）
-2. ODP.NET / `Oracle.ManagedDataAccess.Core` 连接与批量写入
+后续在此实现（当前仅为占位 `OraclePersistencePlaceholder`）：
+
+1. EF Core `DbContext`（`Oracle.EntityFrameworkCore`）—— 应用 Schema 可写数据
+2. ODP.NET / `Oracle.ManagedDataAccess.Core` 连接（凭据现场注入）
 3. 实现 Application `DataAccess` 下的 `I*ReadRepository`，在 `DependencyInjection.cs` 按 `DataMode` 替换 Fake
-4. 实现 `ILocalAccountStore`（正式账号 / 密码哈希 / 角色），按 `Authentication:AccountStore=Oracle` 替换 Fake
-5. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
+4. 新增 **MES Reader** 只读层（生产/质量/工单事实；应用不写 MES）
+5. 实现 `ILocalAccountStore`（正式账号 / 密码哈希 / 角色 / 组织授权），按 `Authentication:AccountStore=Oracle` 替换 Fake
+6. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
 
 真实连接字符串、密码、Wallet、Token **不得**写入仓库；仅允许 `appsettings.Example.json` 占位说明。
 
