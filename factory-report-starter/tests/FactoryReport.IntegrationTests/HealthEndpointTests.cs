@@ -31,7 +31,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
             {
                 ["FactoryReport:DataMode"] = "Fake",
                 ["FactoryReport:ExposeTestExceptionEndpoint"] = "true",
-                ["FactoryReport:Worker:HeartbeatIntervalSeconds"] = "30"
+                ["FactoryReport:Worker:HeartbeatIntervalSeconds"] = "30",
+                ["FactoryReport:Authentication:AccountStore"] = "Fake"
             });
         });
         builder.ConfigureServices(services =>

@@ -35,12 +35,15 @@
 **禁止**写入日志：
 
 - 密码、Token、Bearer / Cookie / Authorization 头完整值
+- Antiforgery / CSRF 令牌明文、登录请求体（含 password 字段）
 - Oracle 连接字符串、Wallet 路径与内容、密钥材料
 - 请求体中的凭证字段、客户敏感业务明细（后续报表查询结果默认不落完整明细）
 
-允许：CorrelationId、路径、方法、状态码、耗时、异常类型与脱敏后的消息。
+允许：CorrelationId、路径、方法、状态码、耗时、UserId、认证成功/失败类别、异常类型与脱敏后的消息。
 
-异常处理日志仅记录 Path / Method / CorrelationId，不记录 Headers 全集或 Body。
+异常处理与认证日志仅记录 Path / Method / CorrelationId（及必要时 UserId），不记录 Headers 全集或 Body。
+
+认证细节见 `docs/authentication.md`（阶段 10）。
 
 ## 配置校验（Options）
 
@@ -48,9 +51,10 @@
 - 绑定类型：`FactoryReportOptions`（`IOptions<T>` + `ValidateOnStart` + `IValidateOptions`）
 - `DataMode`：仅允许 `Fake` / `Oracle`（大小写不敏感）；**默认 Fake**
 - `Worker:HeartbeatIntervalSeconds`：5–3600，默认 30
+- `Authentication:AccountStore`：`Fake`（默认，仅开发/测试）或 `Oracle`（预留；本阶段未实现）。**Production + Fake 启动失败**
 - 示例文件：`appsettings.Example.json`（API / Worker）；仅占位，**严禁**真实连接串 / IP / 账号 / 密码 / Wallet
 
-阶段 2 无论配置为何，Infrastructure 仍强制注册 Fake 实现，避免误连。
+阶段 2/10 无论 DataMode 为何，Infrastructure 对报表数据仍强制注册 Fake 实现，避免误连。认证 Fake 账号存储另受 Production 守卫约束。
 
 ## Fake 与现场边界
 

@@ -4,10 +4,10 @@
 
 | 路径 | 职责 |
 |------|------|
-| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、**生产日报** / **工单进度** / **质量统计** / **计划达成** / **月度生产计划**（`Reporting/*`）。只依赖 Domain。 |
-| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、Options 校验、UTC 时钟、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`。 |
-| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、只读报表端点 `production-daily` / `work-order-progress` / `quality-statistics` / `production-plan-achievement` / `monthly-production-plan`。 |
+| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率、**角色/策略名**）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
+| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、报表服务、**认证抽象**（`ICurrentUserAccessor` / `ILocalAccountStore` / `ILocalAccountAuthenticationService`）。只依赖 Domain。 |
+| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、**Fake 本地账号**、PBKDF2 密码哈希、Options 校验、UTC 时钟、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`、`docs/authentication.md`。 |
+| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、**Cookie 认证与 Antiforgery**、认证端点、只读报表端点。 |
 | `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |
 | `src/FactoryReport.Admin` | Blazor 管理后台空壳。依赖 Application，不依赖 Client。 |
 | `src/FactoryReport.Worker` | 后台 Worker：Fake 模式下启动/停止/周期心跳日志；不连 Oracle/MES。 |
@@ -53,16 +53,18 @@ Tests          -> 被测项目
 
 运维细节（日志脱敏、Correlation ID、健康检查语义、配置校验）见 `docs/operations.md`。
 
-## API 运行时基础（阶段 2 + 阶段 5/6/7/8/9）
+## API 运行时基础（阶段 2 + 阶段 5/6/7/8/9 + 阶段 10）
 
 - `GET /health`：详细状态 JSON（含 Fake 标识）
 - `GET /health/live`：存活检查
 - `GET /health/ready`：就绪检查（Fake 下不连外部）
+- `POST /api/v1/auth/login` / `POST /api/v1/auth/logout` / `GET /api/v1/auth/me`：本地账号 Cookie 认证（见 `docs/authentication.md`）
 - `GET /api/v1/reports/production-daily`：生产日报只读聚合查询（见 `docs/api-production-daily.md`）
 - `GET /api/v1/reports/work-order-progress`：工单进度只读查询（见 `docs/api-work-order-progress.md`）
 - `GET /api/v1/reports/quality-statistics`：质量统计只读聚合查询（见 `docs/api-quality-statistics.md`）
 - `GET /api/v1/reports/production-plan-achievement`：生产计划达成只读组合查询（见 `docs/api-production-plan-achievement.md`）
 - `GET /api/v1/reports/monthly-production-plan`：月度生产计划只读日计划行查询（见 `docs/api-monthly-production-plan.md`）
+- 报表 API **暂不**强制认证（阶段 10 仅建立能力与策略）
 - 全局异常 → RFC 7807 ProblemDetails（校验失败 → 400）
 - `X-Correlation-ID` 透传/生成并写入响应头与日志 Scope
 - Development：可读 Console；Production：JSON Console
@@ -79,9 +81,11 @@ Tests          -> 被测项目
 1. EF Core `DbContext`（`Oracle.EntityFrameworkCore`）
 2. ODP.NET / `Oracle.ManagedDataAccess.Core` 连接与批量写入
 3. 实现 Application `DataAccess` 下的 `I*ReadRepository`，在 `DependencyInjection.cs` 按 `DataMode` 替换 Fake
-4. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
+4. 实现 `ILocalAccountStore`（正式账号 / 密码哈希 / 角色），按 `Authentication:AccountStore=Oracle` 替换 Fake
+5. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
 
 真实连接字符串、密码、Wallet、Token **不得**写入仓库；仅允许 `appsettings.Example.json` 占位说明。
 
 Application 查询入口：`IReportDataQueryService`（供报表引擎按 FactoryId / 日期范围 / 组织范围读取）。  
 生产日报应用服务：`IProductionDailyReportService`（仅依赖上述抽象，不直接引用 Fake 实现类）。
+认证入口：`ILocalAccountAuthenticationService` + Cookie 宿主（见 `docs/authentication.md`）。

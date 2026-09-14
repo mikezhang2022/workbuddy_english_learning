@@ -3,9 +3,11 @@ using FactoryReport.Api.Health;
 using FactoryReport.Api.Infrastructure;
 using FactoryReport.Api.Logging;
 using FactoryReport.Api.Middleware;
+using FactoryReport.Api.Security;
 using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Configuration;
 using FactoryReport.Infrastructure;
+using FactoryReport.Infrastructure.Security;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -18,6 +20,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddFactoryReportAuthentication(builder.Environment);
 
 builder.Services.AddHealthChecks()
     .AddCheck(
@@ -29,6 +32,11 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 var app = builder.Build();
+
+// Production 不得静默启用 Fake 测试账号存储。
+FakeAccountStoreProductionGuard.EnsureNotFakeInProduction(
+    app.Environment,
+    app.Services.GetRequiredService<IOptions<FactoryReportOptions>>().Value);
 
 app.UseCorrelationId();
 app.UseExceptionHandler();
@@ -43,6 +51,12 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     app.UseHttpsRedirection();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+// 认证能力（阶段 10）。现有报表 API 暂不强制 RequireAuthorization。
+app.MapAuthEndpoints();
 
 // 只读报表 API（阶段 5/6/7/8/9）：生产日报、工单进度、质量统计、计划达成、月度生产计划。无写入端点。
 app.MapProductionDailyReportEndpoints();

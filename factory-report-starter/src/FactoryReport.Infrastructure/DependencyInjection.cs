@@ -6,8 +6,10 @@ using FactoryReport.Application.Reporting.ProductionDaily;
 using FactoryReport.Application.Reporting.ProductionPlanAchievement;
 using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
+using FactoryReport.Application.Security;
 using FactoryReport.Infrastructure.Fake;
 using FactoryReport.Infrastructure.Options;
+using FactoryReport.Infrastructure.Security;
 using FactoryReport.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,11 +57,39 @@ public static class DependencyInjection
         services.AddSingleton<IProductionPlanAchievementReportService, ProductionPlanAchievementReportService>();
         services.AddSingleton<IMonthlyProductionPlanReportService, MonthlyProductionPlanReportService>();
 
+        // 阶段 10：本地账号认证。
+        // Fake：进程内测试账号（Development/Testing）。
+        // Oracle：仅预留接口；本阶段未实现，配置为 Oracle 时显式失败，禁止静默回退 Fake。
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<ILocalAccountAuthenticationService, LocalAccountAuthenticationService>();
+
+        var accountStore = configuration
+            .GetSection(FactoryReportOptions.SectionName)
+            .GetSection("Authentication")
+            .GetValue<string>("AccountStore") ?? FakeLocalAccountStore.StoreKindName;
+
+        if (string.Equals(accountStore, FakeLocalAccountStore.StoreKindName, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<ILocalAccountStore, FakeLocalAccountStore>();
+        }
+        else if (string.Equals(accountStore, "Oracle", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "FactoryReport:Authentication:AccountStore=Oracle is reserved but not implemented in this phase. " +
+                "Use Fake for Development/Testing only. See docs/authentication.md and Persistence/Oracle placeholder.");
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                $"FactoryReport:Authentication:AccountStore '{accountStore}' is not supported. Allowed: Fake, Oracle.");
+        }
+
         // 【待现场确认】未来 Oracle 替换点：
         // 1. 在 Persistence/Oracle/ 实现上述 I*ReadRepository 接口（DbContext / ODP.NET）。
-        // 2. 按 DataMode=Oracle 在本方法切换注册（凭据由服务器环境注入，不得写入仓库）。
-        // 3. 不得在 Cursor Cloud 启用 Oracle 模式。
-        // 见 OraclePersistencePlaceholder 与 docs/fake-data.md。
+        // 2. 实现 ILocalAccountStore 的 Oracle 版本（正式账号/密码哈希/角色持久化），按 AccountStore=Oracle 切换（替换上方 throw）。
+        // 3. 按 DataMode=Oracle 在本方法切换仓储注册（凭据由服务器环境注入，不得写入仓库）。
+        // 4. 不得在 Cursor Cloud 启用 Oracle 模式。
+        // 见 OraclePersistencePlaceholder、docs/fake-data.md、docs/authentication.md。
         _ = configuredMode;
 
         return services;

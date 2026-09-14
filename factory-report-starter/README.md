@@ -4,21 +4,25 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 9 完成）
+## 当前状态（阶段 10 完成）
 
-已实现稳定报表编码 **`monthly_production_plan`** 的只读查询 API（基于 Application 抽象 + Fake 内存数据层）；阶段 5/6/7/8 的 **`production_daily`** / **`work_order_progress`** / **`quality_statistics`** / **`production_plan_achievement`** 仍保留。
+已实现 **本地账号密码 + 安全 Cookie** 认证基础（Fake 内存账号；Production 拒绝 Fake）。阶段 5–9 的只读报表 API 仍保留，**暂不**强制 `RequireAuthorization`。
 
-- 默认 **Fake 模式**（进程内确定性夹具，不连接任何数据库）。
-- **API**：
-  - `GET /api/v1/reports/production-daily`（阶段 5；见 `docs/api-production-daily.md`）
-  - `GET /api/v1/reports/work-order-progress`（阶段 6；见 `docs/api-work-order-progress.md`）
-  - `GET /api/v1/reports/quality-statistics`（阶段 7；见 `docs/api-quality-statistics.md`）
-  - `GET /api/v1/reports/production-plan-achievement`（阶段 8；见 `docs/api-production-plan-achievement.md`）
-  - `GET /api/v1/reports/monthly-production-plan`（阶段 9；见 `docs/api-monthly-production-plan.md`）
-- Application：`IMonthlyProductionPlanReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读日计划与数据集版本；API 不直接依赖 Fake 实现类。
-- **日计划原则**：返回月度文件内日计划行（保留 `PlanDate`）；**不得**将月计划平均推算到每天。
-- **Fake 版本规则**：仅返回 `Published` 且 `Active` 的计划版本（夹具含 Draft 负向样例）；真实 Excel 发布/激活/回退【待现场确认】。
-- **本阶段不包含** 报表页面、登录/权限、MES 同步、Excel 写入、Oracle Migration/DDL、SQL Server。
+- 默认 **Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。
+- **认证 API**（见 `docs/authentication.md`）：
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/logout`（Antiforgery）
+  - `GET /api/v1/auth/me`
+- **报表 API**（阶段 5–9；均暂不强制登录）：
+  - `GET /api/v1/reports/production-daily`（见 `docs/api-production-daily.md`）
+  - `GET /api/v1/reports/work-order-progress`（见 `docs/api-work-order-progress.md`）
+  - `GET /api/v1/reports/quality-statistics`（见 `docs/api-quality-statistics.md`）
+  - `GET /api/v1/reports/production-plan-achievement`（见 `docs/api-production-plan-achievement.md`）
+  - `GET /api/v1/reports/monthly-production-plan`（见 `docs/api-monthly-production-plan.md`）
+- Cookie：HttpOnly；Production 强制 Secure；SameSite=Lax；不存密码/权限明细。
+- 角色：`SystemAdmin` / `FactoryAdmin` / `ProductionManager` / `QualityUser` / `Viewer`（策略已定义）。
+- Fake 测试口令 **仅**存在于测试代码与 `docs/authentication.md`，**不**作为 README 生产默认管理员密码。
+- **本阶段不包含** 组织数据范围强制、用户管理 UI、Oracle 账号持久化、Excel 写入、MES 同步、报表页面。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
@@ -39,6 +43,7 @@
 - `AGENTS.md`：所有代码代理必须遵守的项目规则。
 - `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
+- `docs/authentication.md`：Cookie 登录、角色、Fake/生产边界、Oracle 账号替换点（阶段 10）。
 - `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
 - `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
 - `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。
@@ -89,7 +94,17 @@ curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready 
 
 期望：`/health/ready` 在 Fake 模式下返回 Healthy，且过程中不连接 Oracle/MES。
 
-生产日报示例（Fake 夹具日期）：
+登录示例（**仅开发/测试 Fake 账号**；口令见 `docs/authentication.md` / 测试代码，勿用于生产）：
+
+```bash
+# 登录后保存 Cookie，并从响应头读取 X-CSRF-TOKEN 供 logout 使用
+curl -s -c /tmp/fr.cookie -D - -X POST http://localhost:5000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userName":"viewer","password":"<见测试代码 DevPassword_Viewer>"}'
+curl -s -b /tmp/fr.cookie http://localhost:5000/api/v1/auth/me
+```
+
+生产日报示例（Fake 夹具日期；本阶段仍可不登录访问）：
 
 ```bash
 curl -s "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"

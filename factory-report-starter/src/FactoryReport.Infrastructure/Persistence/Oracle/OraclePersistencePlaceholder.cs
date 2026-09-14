@@ -8,11 +8,13 @@ namespace FactoryReport.Infrastructure.Persistence.Oracle;
 /// - 实现 Application.DataAccess 下的只读仓储接口：
 ///   IOrganizationReadRepository / IProductReadRepository / IWorkOrderReadRepository /
 ///   IProductionRecordReadRepository / IDailyProductionPlanReadRepository / IImportBatchReadRepository
-/// - EF Core DbContext（Oracle.EntityFrameworkCore）
+/// - 实现 Application.Security.ILocalAccountStore（正式账号、密码哈希、角色；禁止明文密码）
+/// - EF Core DbContext（Oracle.EntityFrameworkCore）—— 本阶段禁止实现
 /// - ODP.NET / Oracle.ManagedDataAccess.Core 连接（凭据由服务器环境注入，不得写入仓库）
 /// - Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
 ///
-/// 当前默认 DataAccessMode=Fake；Cursor Cloud 禁止启用 Oracle。
+/// 当前默认 DataAccessMode=Fake、Authentication:AccountStore=Fake；Cursor Cloud 禁止启用 Oracle。
+/// 认证边界详见 docs/authentication.md。
 /// </summary>
 public static class OraclePersistencePlaceholder
 {
@@ -28,6 +30,7 @@ public static class OraclePersistencePlaceholder
         "FactoryReport.Application.DataAccess.IWorkOrderReadRepository",
         "FactoryReport.Application.DataAccess.IProductionRecordReadRepository",
         "FactoryReport.Application.DataAccess.IDailyProductionPlanReadRepository",
-        "FactoryReport.Application.DataAccess.IImportBatchReadRepository"
+        "FactoryReport.Application.DataAccess.IImportBatchReadRepository",
+        "FactoryReport.Application.Security.ILocalAccountStore"
     ];
 }

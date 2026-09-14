@@ -21,6 +21,11 @@ public sealed class FactoryReportOptions
     /// Worker 运行参数。
     /// </summary>
     public WorkerRuntimeOptions Worker { get; set; } = new();
+
+    /// <summary>
+    /// 本地账号认证配置（阶段 10）。默认 Fake；Production 不得启用 Fake。
+    /// </summary>
+    public AuthenticationOptions Authentication { get; set; } = new();
 }
 
 /// <summary>
@@ -32,4 +37,16 @@ public sealed class WorkerRuntimeOptions
     /// 心跳间隔（秒）。默认 30。
     /// </summary>
     public int HeartbeatIntervalSeconds { get; set; } = 30;
+}
+
+/// <summary>
+/// 认证相关运行配置。
+/// </summary>
+public sealed class AuthenticationOptions
+{
+    /// <summary>
+    /// 账号存储实现：Fake（开发/测试内存）或 Oracle（未来现场持久化，本阶段未实现）。
+    /// 默认 Fake。Production + Fake 将在启动时失败。
+    /// </summary>
+    public string AccountStore { get; set; } = "Fake";
 }

@@ -59,4 +59,37 @@ public class FactoryReportOptionsValidatorTests
 
         Assert.False(result.Failed);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("SqlServer")]
+    [InlineData("memory")]
+    public void Validate_Fails_ForInvalidAccountStore(string accountStore)
+    {
+        var options = new FactoryReportOptions
+        {
+            DataMode = "Fake",
+            Authentication = new AuthenticationOptions { AccountStore = accountStore }
+        };
+
+        var result = _validator.Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Theory]
+    [InlineData("Fake")]
+    [InlineData("Oracle")]
+    public void Validate_Succeeds_ForKnownAccountStores(string accountStore)
+    {
+        var options = new FactoryReportOptions
+        {
+            DataMode = "Fake",
+            Authentication = new AuthenticationOptions { AccountStore = accountStore }
+        };
+
+        var result = _validator.Validate(Options.DefaultName, options);
+
+        Assert.False(result.Failed);
+    }
 }
