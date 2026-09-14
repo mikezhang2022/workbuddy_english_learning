@@ -13,10 +13,9 @@
 | 工厂 | 2 | `F-DEMO-01`（Id=1）、`F-DEMO-02`（Id=2） |
 | 车间 | 3 | 工厂 1：`W-DEMO-A` / `W-DEMO-B`；工厂 2：`W-DEMO-X` |
 | 产线 | 4 | A1、A2、B1、X1 |
-| 产品 | 6 | 覆盖边界场景与日期筛选 |
+| 产品 | 7 | 覆盖边界场景、日期筛选与零检验数 |
 | 工单 | 7 | 工厂 1：正常进行中 / 计划 0 / 车间 B / 已关闭 / 已完成 / 未完成延期候选；工厂 2：隔离工单。含计划开始/完成 UTC 与 Fake 临时状态 |
-
-| 生产事实 | 6 | 含完整数量分列与跨车间/跨厂 |
+| 生产事实 | 7 | 含完整数量分列、跨车间/跨厂与零检验数 |
 | 日计划行 | 6 | 故意缺省「仅有实际」产品的计划 |
 | 导入批次 / 版本 | 各 2 | `monthly_production_plan`，按工厂隔离 |
 
@@ -70,6 +69,16 @@
 | `WO-DEMO-OVERDUE` | Open | Day2 12:00 | 未完成且超期 → IsOverdue |
 | `WO-DEMO-2001` | Open | Day3 16:00 | 工厂 2 隔离；超报剩余 0 |
 
+### 质量统计场景（阶段 7）
+
+| 产品编码 | 用途 |
+|---|---|
+| `PROD-NORMAL` | 完整分列：检验 100 / 良品 90 / 不良 5 / 报废 3 / 返工 2 → YieldRate 0.9、DefectRate 0.05 |
+| `PROD-ZERO-INSP` | 检验 0；Scrap=1、Rework=1 分列保留 → YieldRate/DefectRate 均为 null |
+| （其余产品行） | 与生产日报共用组织/日期筛选断言 |
+
+**工单筛选**：当前 `ProductionRecord` 无工单维度，质量统计 API **不提供** `workOrderCode`。
+
 ---
 
 ## 3. 数据集限制
@@ -97,6 +106,7 @@ Application（`FactoryReport.Application/DataAccess/`）：
 | `IReportDataQueryService` / `ReportDataQueryService` | 报表引擎聚合查询入口 |
 | `IProductionDailyReportService` | 生产日报（`production_daily`）只读聚合；见 `docs/api-production-daily.md` |
 | `IWorkOrderProgressReportService` | 工单进度（`work_order_progress`）只读查询；见 `docs/api-work-order-progress.md` |
+| `IQualityStatisticsReportService` | 质量统计（`quality_statistics`）只读聚合；见 `docs/api-quality-statistics.md` |
 
 筛选类型：`OrganizationScopeFilter`、`DateRangeFilter`。
 

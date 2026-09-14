@@ -130,6 +130,9 @@ public static class DeterministicFakeFixture
     /// <summary>Day2 用于日期范围筛选。</summary>
     public const string ProductDay2 = "PROD-DAY2";
 
+    /// <summary>质量统计：检验数为 0 → YieldRate/DefectRate 均为 null。</summary>
+    public const string ProductZeroInspection = "PROD-ZERO-INSP";
+
     public static readonly Guid ImportBatchFactory1Id = Guid.Parse("11111111-1111-4111-8111-111111111111");
     public static readonly Guid ImportBatchFactory2Id = Guid.Parse("22222222-2222-4222-8222-222222222222");
     public static readonly Guid DatasetVersionFactory1Id = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -168,6 +171,7 @@ public static class DeterministicFakeFixture
             new Product(1003, FactoryDemo1Id, ProductActualOnly, "Actual Without Plan Product"),
             new Product(1004, FactoryDemo1Id, ProductPlanOnly, "Plan Without Actual Product"),
             new Product(1005, FactoryDemo1Id, ProductDay2, "Day2 Range Filter Product"),
+            new Product(1006, FactoryDemo1Id, ProductZeroInspection, "Zero Inspection Quantity Product"),
             new Product(2001, FactoryDemo2Id, ProductFactory2, "Factory Two Isolated Product")
         };
 
@@ -343,6 +347,24 @@ public static class DeterministicFakeFixture
             dataUpdatedAtUtc: FixedUpdatedAtUtc,
             shiftCode: "NIGHT");
 
+        // 质量统计：检验数为 0 → YieldRate / DefectRate 均为 null
+        // 『仅用于开发测试，不代表现场 MES 正式口径』
+        var recordZeroInspection = new ProductionRecord(
+            factoryId: FactoryDemo1Id,
+            workshopId: WorkshopAId,
+            productionLineId: LineA1Id,
+            productionDate: Day1,
+            productCode: ProductZeroInspection,
+            quantities: new ProductionQuantities(
+                actualQuantity: 5m,
+                goodQuantity: 0m,
+                defectQuantity: 0m,
+                scrapQuantity: 1m,
+                reworkQuantity: 1m,
+                inspectedQuantity: 0m),
+            dataUpdatedAtUtc: FixedUpdatedAtUtc,
+            shiftCode: "DAY");
+
         var productionRecords = new[]
         {
             recordNormal,
@@ -350,7 +372,8 @@ public static class DeterministicFakeFixture
             recordActualOnly,
             recordDay2,
             recordFactory2,
-            recordWorkshopB
+            recordWorkshopB,
+            recordZeroInspection
         };
 
         var dailyPlans = new[]
