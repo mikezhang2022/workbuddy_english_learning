@@ -114,4 +114,8 @@ dotnet run --project src/FactoryReport.Client
 
 ## 9. 阶段 15：质量统计数据页
 
-已实现第三个真实可查询报表页：`/reports/quality-statistics`。字段、Fake 质量口径、范围与离线边界见 **`docs/ui-quality-statistics.md`**。其余两张报表（计划达成、月度计划）仍为占位。
+已实现第三个真实可查询报表页：`/reports/quality-statistics`。字段、Fake 质量口径、范围与离线边界见 **`docs/ui-quality-statistics.md`**。
+
+## 10. 阶段 16：计划达成数据页
+
+已实现第四个真实可查询报表页：`/reports/production-plan-achievement`。字段、四种 PlanStatus 中文文案、范围与离线边界见 **`docs/ui-production-plan-achievement.md`**。月度计划仍为占位。

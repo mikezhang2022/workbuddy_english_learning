@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FactoryReport.Application.Reporting.ProductionDaily;
+using FactoryReport.Application.Reporting.ProductionPlanAchievement;
 using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
 
@@ -116,6 +117,33 @@ public sealed class ReportsApiClient(IHttpClientFactory httpClientFactory)
         });
     }
 
+    public async Task<ProductionPlanAchievementQueryResponse> GetProductionPlanAchievementAsync(
+        ProductionPlanAchievementClientQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var path = BuildProductionPlanAchievementPath(query);
+        var client = httpClientFactory.CreateClient(ApiConstants.HttpClientName);
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            throw new ApiRequestException(ApiProblemDetailsParser.NetworkError());
+        }
+
+        await ApiResponseHandler.EnsureSuccessOrThrowAsync(response, cancellationToken).ConfigureAwait(false);
+        var result = await response.Content
+            .ReadFromJsonAsync<ProductionPlanAchievementQueryResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+        return result ?? throw new ApiRequestException(new ApiProblemDetails
+        {
+            Detail = "计划达成响应无效。"
+        });
+    }
+
     public static string BuildProductionDailyPath(ProductionDailyClientQuery query)
     {
         var sb = new StringBuilder("/api/v1/reports/production-daily?");
@@ -213,6 +241,32 @@ public sealed class ReportsApiClient(IHttpClientFactory httpClientFactory)
 
         return sb.ToString();
     }
+
+    public static string BuildProductionPlanAchievementPath(ProductionPlanAchievementClientQuery query)
+    {
+        var sb = new StringBuilder("/api/v1/reports/production-plan-achievement?");
+        sb.Append("factoryId=").Append(query.FactoryId.ToString(CultureInfo.InvariantCulture));
+        sb.Append("&startDate=").Append(query.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        sb.Append("&endDate=").Append(query.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+        if (query.WorkshopId is > 0)
+        {
+            sb.Append("&workshopId=").Append(query.WorkshopId.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (query.ProductionLineId is > 0)
+        {
+            sb.Append("&productionLineId=")
+                .Append(query.ProductionLineId.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.ProductCode))
+        {
+            sb.Append("&productCode=").Append(Uri.EscapeDataString(query.ProductCode.Trim()));
+        }
+
+        return sb.ToString();
+    }
 }
 
 /// <summary>
@@ -247,6 +301,19 @@ public sealed class WorkOrderProgressClientQuery
 /// 质量统计客户端查询参数（与 API query 对齐）。
 /// </summary>
 public sealed class QualityStatisticsClientQuery
+{
+    public long FactoryId { get; init; }
+    public DateOnly StartDate { get; init; }
+    public DateOnly EndDate { get; init; }
+    public long? WorkshopId { get; init; }
+    public long? ProductionLineId { get; init; }
+    public string? ProductCode { get; init; }
+}
+
+/// <summary>
+/// 生产计划达成客户端查询参数（与 API query 对齐）。
+/// </summary>
+public sealed class ProductionPlanAchievementClientQuery
 {
     public long FactoryId { get; init; }
     public DateOnly StartDate { get; init; }
