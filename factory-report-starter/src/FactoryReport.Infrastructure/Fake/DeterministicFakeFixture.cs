@@ -67,8 +67,34 @@ public static class DeterministicFakeFixture
     public static readonly UtcInstant FixedPublishedAtUtc =
         UtcInstant.FromUtcDateTime(new DateTime(2026, 3, 9, 12, 0, 0, DateTimeKind.Utc));
 
+    /// <summary>工单计划开始（固定 UTC）。</summary>
+    public static readonly UtcInstant FixedPlannedStartUtc =
+        UtcInstant.FromUtcDateTime(new DateTime(2026, 3, 10, 8, 0, 0, DateTimeKind.Utc));
+
+    /// <summary>工单计划完成（固定 UTC；Day3 16:00）。</summary>
     public static readonly UtcInstant FixedPlannedFinishUtc =
         UtcInstant.FromUtcDateTime(new DateTime(2026, 3, 12, 16, 0, 0, DateTimeKind.Utc));
+
+    /// <summary>较早计划完成（Day2 12:00），供延期场景。</summary>
+    public static readonly UtcInstant EarlyPlannedFinishUtc =
+        UtcInstant.FromUtcDateTime(new DateTime(2026, 3, 11, 12, 0, 0, DateTimeKind.Utc));
+
+    /// <summary>Fake 时钟断言常用「当前时间」：晚于 Early、早于 Fixed 计划完成。</summary>
+    public static readonly UtcInstant FakeComparedAtUtc =
+        UtcInstant.FromUtcDateTime(new DateTime(2026, 3, 12, 10, 0, 0, DateTimeKind.Utc));
+
+    // —— Fake 工单状态（临时，非 MES 正式枚举）【待现场确认】——
+    public const string StatusOpen = "Open";
+    public const string StatusCompleted = "Completed";
+    public const string StatusClosed = "Closed";
+
+    public const string WorkOrderNormal = "WO-DEMO-1001";
+    public const string WorkOrderPlanZero = "WO-DEMO-1002";
+    public const string WorkOrderWorkshopB = "WO-DEMO-B001";
+    public const string WorkOrderFactory2 = "WO-DEMO-2001";
+    public const string WorkOrderClosed = "WO-DEMO-CLOSED";
+    public const string WorkOrderCompleted = "WO-DEMO-DONE";
+    public const string WorkOrderOverdueOpen = "WO-DEMO-OVERDUE";
 
     // —— 组织 ——
     public const long FactoryDemo1Id = 1;
@@ -145,49 +171,103 @@ public static class DeterministicFakeFixture
             new Product(2001, FactoryDemo2Id, ProductFactory2, "Factory Two Isolated Product")
         };
 
+        // 工单夹具：『仅用于开发测试，不代表现场 MES 正式口径』。
+        // StatusCode 为 Fake 临时值（Open/Completed/Closed），正式枚举【待现场确认】。
         var workOrders = new[]
         {
+            // 进行中：计划完成 FixedPlannedFinishUtc；在 FakeComparedAtUtc 时尚不延期
             new WorkOrder(
                 id: 5001,
                 factoryId: FactoryDemo1Id,
-                workOrderNo: "WO-DEMO-1001",
+                workOrderNo: WorkOrderNormal,
                 productCode: ProductNormal,
                 planQuantity: 120m,
                 completedQuantity: 100m,
                 workshopId: WorkshopAId,
                 productionLineId: LineA1Id,
+                plannedStartAtUtc: FixedPlannedStartUtc,
                 plannedFinishAtUtc: FixedPlannedFinishUtc,
-                statusCode: "Open"),
+                statusCode: StatusOpen),
+            // 计划数量 0 → CompletionRate null
             new WorkOrder(
                 id: 5002,
                 factoryId: FactoryDemo1Id,
-                workOrderNo: "WO-DEMO-1002",
+                workOrderNo: WorkOrderPlanZero,
                 productCode: ProductPlanZero,
                 planQuantity: 0m,
                 completedQuantity: 0m,
                 workshopId: WorkshopAId,
                 productionLineId: LineA1Id,
-                statusCode: "Open"),
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: FixedPlannedFinishUtc,
+                statusCode: StatusOpen),
+            // 车间 B / 产线 B1 组织筛选
             new WorkOrder(
                 id: 5003,
                 factoryId: FactoryDemo1Id,
-                workOrderNo: "WO-DEMO-B001",
+                workOrderNo: WorkOrderWorkshopB,
                 productCode: ProductNormal,
                 planQuantity: 50m,
                 completedQuantity: 10m,
                 workshopId: WorkshopBId,
                 productionLineId: LineB1Id,
-                statusCode: "Open"),
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: FixedPlannedFinishUtc,
+                statusCode: StatusOpen),
+            // 已关闭且计划完成已过：即使比较时间晚于计划完成也不延期
+            new WorkOrder(
+                id: 5004,
+                factoryId: FactoryDemo1Id,
+                workOrderNo: WorkOrderClosed,
+                productCode: ProductNormal,
+                planQuantity: 80m,
+                completedQuantity: 80m,
+                workshopId: WorkshopAId,
+                productionLineId: LineA1Id,
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: EarlyPlannedFinishUtc,
+                actualFinishAtUtc: EarlyPlannedFinishUtc,
+                statusCode: StatusClosed),
+            // 已完成且计划完成已过：不延期
+            new WorkOrder(
+                id: 5005,
+                factoryId: FactoryDemo1Id,
+                workOrderNo: WorkOrderCompleted,
+                productCode: ProductDay2,
+                planQuantity: 40m,
+                completedQuantity: 40m,
+                workshopId: WorkshopAId,
+                productionLineId: LineA2Id,
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: EarlyPlannedFinishUtc,
+                actualFinishAtUtc: EarlyPlannedFinishUtc,
+                statusCode: StatusCompleted),
+            // 未完成且计划完成已过（Early）：在 FakeComparedAtUtc 下应标记延期
+            new WorkOrder(
+                id: 5006,
+                factoryId: FactoryDemo1Id,
+                workOrderNo: WorkOrderOverdueOpen,
+                productCode: ProductActualOnly,
+                planQuantity: 60m,
+                completedQuantity: 20m,
+                workshopId: WorkshopAId,
+                productionLineId: LineA1Id,
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: EarlyPlannedFinishUtc,
+                statusCode: StatusOpen),
+            // 工厂 2 隔离
             new WorkOrder(
                 id: 6001,
                 factoryId: FactoryDemo2Id,
-                workOrderNo: "WO-DEMO-2001",
+                workOrderNo: WorkOrderFactory2,
                 productCode: ProductFactory2,
                 planQuantity: 180m,
                 completedQuantity: 200m,
                 workshopId: WorkshopXId,
                 productionLineId: LineX1Id,
-                statusCode: "Open")
+                plannedStartAtUtc: FixedPlannedStartUtc,
+                plannedFinishAtUtc: FixedPlannedFinishUtc,
+                statusCode: StatusOpen)
         };
 
         // 场景 a+e：正常有计划有实际 + 完整数量分列（良品/不良/报废/返工/检验）

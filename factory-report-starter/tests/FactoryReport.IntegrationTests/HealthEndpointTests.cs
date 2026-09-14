@@ -1,11 +1,24 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using FactoryReport.Application.Abstractions;
+using FactoryReport.Domain.Common;
+using FactoryReport.Infrastructure.Fake;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FactoryReport.IntegrationTests;
+
+/// <summary>
+/// Testing 环境固定 UTC 时钟，避免延期断言依赖系统实时日期。
+/// </summary>
+internal sealed class FixedTestingUtcClock : IUtcClock
+{
+    public UtcInstant UtcNow { get; } = DeterministicFakeFixture.FakeComparedAtUtc;
+}
 
 public class ApiWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -20,6 +33,11 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["FactoryReport:ExposeTestExceptionEndpoint"] = "true",
                 ["FactoryReport:Worker:HeartbeatIntervalSeconds"] = "30"
             });
+        });
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IUtcClock>();
+            services.AddSingleton<IUtcClock, FixedTestingUtcClock>();
         });
     }
 }

@@ -44,8 +44,9 @@ if (!app.Environment.IsEnvironment("Testing"))
     app.UseHttpsRedirection();
 }
 
-// 只读报表 API（阶段 5）：生产日报。无写入端点。
+// 只读报表 API（阶段 5/6）：生产日报、工单进度。无写入端点。
 app.MapProductionDailyReportEndpoints();
+app.MapWorkOrderProgressReportEndpoints();
 
 app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataStore store) =>
 {

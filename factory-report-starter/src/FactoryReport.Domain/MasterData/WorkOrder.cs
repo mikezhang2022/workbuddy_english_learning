@@ -5,6 +5,10 @@ namespace FactoryReport.Domain.MasterData;
 
 /// <summary>
 /// 工单主数据标识。延期等正式口径【待现场确认】，本对象仅保存标识与分列数量。
+/// <para>
+/// StatusCode 为临时字符串（如 Open / Completed / Closed），
+/// 『仅用于开发测试，不代表现场 MES 正式枚举』；正式状态枚举【待现场确认】。
+/// </para>
 /// </summary>
 public sealed class WorkOrder
 {
@@ -16,6 +20,7 @@ public sealed class WorkOrder
     public string ProductCode { get; }
     public decimal PlanQuantity { get; }
     public decimal CompletedQuantity { get; }
+    public UtcInstant? PlannedStartAtUtc { get; }
     public UtcInstant? PlannedFinishAtUtc { get; }
     public UtcInstant? ActualFinishAtUtc { get; }
     public string? StatusCode { get; }
@@ -29,6 +34,7 @@ public sealed class WorkOrder
         decimal completedQuantity,
         long? workshopId = null,
         long? productionLineId = null,
+        UtcInstant? plannedStartAtUtc = null,
         UtcInstant? plannedFinishAtUtc = null,
         UtcInstant? actualFinishAtUtc = null,
         string? statusCode = null)
@@ -66,6 +72,7 @@ public sealed class WorkOrder
         ProductCode = productCode.Trim();
         PlanQuantity = planQuantity;
         CompletedQuantity = completedQuantity;
+        PlannedStartAtUtc = plannedStartAtUtc;
         PlannedFinishAtUtc = plannedFinishAtUtc;
         ActualFinishAtUtc = actualFinishAtUtc;
         StatusCode = string.IsNullOrWhiteSpace(statusCode) ? null : statusCode.Trim();

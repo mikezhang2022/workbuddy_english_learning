@@ -63,8 +63,9 @@
 
 ### 2.3 工单延期
 
-- [x] **Fake**：`isOverdue` = 当前 UTC 时间 > plannedFinishAt 且工单未关闭。**正式规则【见 ③】。**
-- [x] **Fake**：完成数 > 计划时，`remainingQuantity` 显示 0，`completionRate` 允许 > 100%。
+- [x] **Fake（工单进度 API，阶段 6）**：`isOverdue` = 未完成且未关闭（`status` 非 `Completed`/`Closed`）且当前 UTC（`IUtcClock`）> `plannedFinishUtc`。响应元数据标注『Fake 测试规则：现场须确认工单状态枚举、时区、延期口径与计划时间来源』。**正式规则【见 ③】。**
+- [x] **Fake**：`StatusCode` 临时使用 `Open` / `Completed` / `Closed` 字符串，**不是** MES 正式枚举。【待现场确认】
+- [x] **Fake**：完成数 > 计划时，`remainingQuantity` 显示 0，`completionRate` 允许 > 100%；计划为 0 时 `completionRate = null`（同达成率零分母）。
 
 ### 2.4 计划达成与 Excel
 

@@ -4,14 +4,17 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 5 完成）
+## 当前状态（阶段 6 完成）
 
-已实现稳定报表编码 **`production_daily`** 的只读查询 API 与聚合逻辑（基于 Fake 内存数据层）；此前阶段保留领域模型、Fake 夹具与运维基础。
+已实现稳定报表编码 **`work_order_progress`** 的只读查询 API（基于 Application 抽象 + Fake 内存数据层）；阶段 5 的 **`production_daily`** 仍保留。
 
 - 默认 **Fake 模式**（进程内确定性夹具，不连接任何数据库）。
-- **API**：`GET /api/v1/reports/production-daily`（只读；无写入端点）。说明见 `docs/api-production-daily.md`。
-- Application：`IProductionDailyReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读数，API 不直接依赖 Fake 实现类。
-- Fake 良率临时口径：`YieldRate = GoodQuantity / InspectionQuantity`（分母 0 → `null`），响应元数据标注『Fake 测试口径，现场 MES 接入前须确认』。
+- **API**：
+  - `GET /api/v1/reports/production-daily`（阶段 5；见 `docs/api-production-daily.md`）
+  - `GET /api/v1/reports/work-order-progress`（阶段 6；见 `docs/api-work-order-progress.md`）
+- Application：`IWorkOrderProgressReportService` + 请求/响应 DTO；经 `IReportDataQueryService` 读数；延期比较经可注入 `IUtcClock`；API 不直接依赖 Fake 实现类。
+- Fake 延期临时规则：未完成/未关闭且 `UtcNow > PlannedFinishUtc` → `IsOverdue`；响应元数据标注『Fake 测试规则：现场须确认工单状态枚举、时区、延期口径与计划时间来源』。
+- Fake 完成率：`ActualQuantity / PlannedQuantity`；计划为 0 → `null`（同达成率零分母）。
 - **本阶段不包含** 报表页面、登录/权限、MES 同步、Excel、Oracle Migration/DDL、SQL Server。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
@@ -33,9 +36,10 @@
 - `AGENTS.md`：所有代码代理必须遵守的项目规则。
 - `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
-- `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3）。
-- `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4）。
-- `docs/api-production-daily.md`：生产日报查询 API（阶段 5；参数、响应、Fake 口径与边界）。
+- `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3+）。
+- `docs/fake-data.md`：Fake 夹具场景、限制与 Oracle 替换点（阶段 4+）。
+- `docs/api-production-daily.md`：生产日报查询 API（阶段 5）。
+- `docs/api-work-order-progress.md`：工单进度查询 API（阶段 6；参数、响应、Fake 延期规则与待确认项）。
 - `docs/data-dictionary.md`：数据字典（规划口径）。
 - `docs/business-decisions.md`：业务决策记录（已确认 / Fake 临时 / 待现场确认）。
 - `docs/source-mapping-template.md`：源系统映射模板（待现场填写）。
@@ -83,6 +87,12 @@ curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready 
 
 ```bash
 curl -s "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+```
+
+工单进度示例：
+
+```bash
+curl -s "http://localhost:5000/api/v1/reports/work-order-progress?factoryId=1&workOrderCode=WO-DEMO-OVERDUE"
 ```
 
 配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token、连接字符串或 Oracle Wallet。

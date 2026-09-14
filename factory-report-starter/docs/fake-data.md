@@ -14,7 +14,8 @@
 | 车间 | 3 | 工厂 1：`W-DEMO-A` / `W-DEMO-B`；工厂 2：`W-DEMO-X` |
 | 产线 | 4 | A1、A2、B1、X1 |
 | 产品 | 6 | 覆盖边界场景与日期筛选 |
-| 工单 | 4 | 两工厂各有工单 |
+| 工单 | 7 | 工厂 1：正常进行中 / 计划 0 / 车间 B / 已关闭 / 已完成 / 未完成延期候选；工厂 2：隔离工单。含计划开始/完成 UTC 与 Fake 临时状态 |
+
 | 生产事实 | 6 | 含完整数量分列与跨车间/跨厂 |
 | 日计划行 | 6 | 故意缺省「仅有实际」产品的计划 |
 | 导入批次 / 版本 | 各 2 | `monthly_production_plan`，按工厂隔离 |
@@ -27,8 +28,20 @@
 | Day2 | `2026-03-11` |
 | Day3 | `2026-03-12`（范围内无事实，供空结果断言） |
 | DataUpdatedAtUtc | `2026-03-10T08:00:00Z` |
+| PlannedStartUtc | `2026-03-10T08:00:00Z` |
+| PlannedFinishUtc（常规） | `2026-03-12T16:00:00Z` |
+| EarlyPlannedFinishUtc（延期场景） | `2026-03-11T12:00:00Z` |
+| FakeComparedAtUtc（测试比较时间） | `2026-03-12T10:00:00Z` |
 
 实现：`Infrastructure/Fake/DeterministicFakeFixture.cs`。
+
+### Fake 工单状态（临时，非 MES 正式枚举）【待现场确认】
+
+| StatusCode | 用途 |
+|---|---|
+| `Open` | 未完成 |
+| `Completed` | 已完成（不延期） |
+| `Closed` | 已关闭（不延期） |
 
 ---
 
@@ -44,6 +57,18 @@
 | f. 组织隔离 | `PROD-F2`（工厂 2） | 180 | 200 | 按 `FactoryId` 筛选互不串扰 |
 
 额外：Day2 `PROD-DAY2` 用于日期范围筛选；车间 B 行用于组织范围筛选。
+
+### 工单进度场景（阶段 6）
+
+| 工单号 | 状态（Fake） | 计划完成 | 期望（在 FakeComparedAtUtc） |
+|---|---|---|---|
+| `WO-DEMO-1001` | Open | Day3 16:00 | 进行中，不延期；完成率 100/120 |
+| `WO-DEMO-1002` | Open | Day3 16:00 | 计划 0 → CompletionRate null |
+| `WO-DEMO-B001` | Open | Day3 16:00 | 车间 B 筛选 |
+| `WO-DEMO-CLOSED` | Closed | Day2 12:00 | 已关闭，不延期 |
+| `WO-DEMO-DONE` | Completed | Day2 12:00 | 已完成，不延期 |
+| `WO-DEMO-OVERDUE` | Open | Day2 12:00 | 未完成且超期 → IsOverdue |
+| `WO-DEMO-2001` | Open | Day3 16:00 | 工厂 2 隔离；超报剩余 0 |
 
 ---
 
@@ -71,6 +96,7 @@ Application（`FactoryReport.Application/DataAccess/`）：
 | `IImportBatchReadRepository` | 导入批次 / 数据版本 |
 | `IReportDataQueryService` / `ReportDataQueryService` | 报表引擎聚合查询入口 |
 | `IProductionDailyReportService` | 生产日报（`production_daily`）只读聚合；见 `docs/api-production-daily.md` |
+| `IWorkOrderProgressReportService` | 工单进度（`work_order_progress`）只读查询；见 `docs/api-work-order-progress.md` |
 
 筛选类型：`OrganizationScopeFilter`、`DateRangeFilter`。
 
