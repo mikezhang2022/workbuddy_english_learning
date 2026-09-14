@@ -4,14 +4,16 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 2）
+## 当前状态（阶段 3 完成）
 
-已建立运行基础设施：健康检查、ProblemDetails、Correlation ID、结构化日志、Options 校验、Worker 心跳。
+已建立数据库无关的第一版领域模型（组织 / 主数据 / 生产事实 / 月度计划 / 导入与发布状态 / 稳定报表编码 / 计划达成边界规则），并附带单元测试。
 
 - 默认 **Fake 模式**（内存数据，不连接任何数据库）。
+- **本阶段不包含** Oracle 表结构、EF Migration、DDL 或 Schema 脚本。
 - 已添加 Oracle Provider 的 NuGet 引用，但**未配置真实连接、未连接 Oracle、未建 Schema/迁移**。
 - Client / Admin 仅为标识「开发中 / Fake 模式」的空壳首页。
 - Worker 仅输出启动/停止/心跳日志，不读取 MES/Oracle。
+- 领域说明见 `docs/domain-model.md`。
 
 ## 数据库口径（Oracle）
 
@@ -28,6 +30,7 @@
 - `AGENTS.md`：所有代码代理必须遵守的项目规则。
 - `docs/architecture.md`：目录职责、依赖规则、Fake/现场边界、Oracle 接入点。
 - `docs/operations.md`：日志策略、健康检查语义、配置校验、脱敏规则。
+- `docs/domain-model.md`：领域对象职责、字段对应、已确认/Fake/待确认规则（阶段 3）。
 - `docs/data-dictionary.md`：数据字典（规划口径）。
 - `docs/business-decisions.md`：业务决策记录（已确认 / Fake 临时 / 待现场确认）。
 - `docs/source-mapping-template.md`：源系统映射模板（待现场填写）。

@@ -1,11 +1,11 @@
-# 架构说明（阶段 2）
+# 架构说明（阶段 3）
 
 ## 目录职责
 
 | 路径 | 职责 |
 |------|------|
-| `src/FactoryReport.Domain` | 领域模型与领域规则。无基础设施、无 UI、无数据库驱动。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs。只依赖 Domain。 |
+| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率）。无基础设施、无 UI、无数据库驱动。详见 `docs/domain-model.md`。 |
+| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`。只依赖 Domain。 |
 | `src/FactoryReport.Infrastructure` | 技术实现：Fake 内存数据、Options 校验、未来 Oracle 持久化。依赖 Application + Domain。 |
 | `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志。 |
 | `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |

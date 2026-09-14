@@ -36,6 +36,10 @@
 - [x] 组合数据集只组合已注册数据集，不直连原始库。
 - [x] 系统时间库内按 UTC 保存；业务生产日期与班次单独保存。
 - [x] 项目根目录固定为 `factory-report-starter/`，不改动仓库内英语学习等其他项目。
+- [x] 业务表保留 FactoryId（多工厂）；数量字段分列保存，不在同步/领域层混合计算。
+- [x] 达成率关联键：FactoryId + WorkshopId + ProductionLineId + ProductionDate + ProductCode。
+- [x] 计划为 0 → 达成率为 null；有实际无计划 → 「未配置计划」；有计划无实际 → 实际为 0、达成率 0%。
+- [x] 稳定报表编码：`production_daily` / `work_order_progress` / `quality_statistics` / `production_plan_achievement` / `monthly_production_plan`。
 
 ---
 
@@ -63,11 +67,9 @@
 
 ### 2.4 计划达成与 Excel
 
-- [x] **Fake 关联键**：FactoryId + WorkshopId + ProductionDate + ProductCode。
-- [x] **Fake Excel 唯一键**：factoryCode + workshopCode + productionDate + productCode。
+- [x] **Fake Excel 唯一键**：factoryCode + workshopCode + productionDate + productCode。（正式【见 ③】；领域关联键已确认含 ProductionLineId，见 ①）
 - [x] **Fake ReplaceScope**：factoryCode + planYearMonth。
-- [x] **Fake**：仅有计划无实际 → actual=0，achievementRate=0%；仅有实际无计划 → 达成率「—」；计划为 0 → 达成率「—」。
-- [x] **Fake**：达成率 Decimal 计算，展示四舍五入到 1 位小数。**正式舍入【见 ③】。**
+- [x] **Fake**：达成率 Decimal 计算，展示四舍五入到 1 位小数；UI「—」文案为演示展示。**边界计算规则见 ①；正式舍入/展示【见 ③】。**
 
 ### 2.5 组织与角色（演示 Seed）
 
@@ -107,7 +109,7 @@
 - [ ] 不良率与检验口径【待现场确认】
 - [ ] 工单延期判断规则【待现场确认】
 - [ ] 工单关闭后修订如何反映到报表【待现场确认】
-- [ ] 达成率零分母、缺失计划、缺失实际的正式显示规则【待现场确认】
+- [ ] 达成率零分母、缺失计划、缺失实际的**正式展示文案与舍入**（边界计算规则已在领域确认，见 ①）【待现场确认】
 - [ ] 比率舍入与单位（件/%）【待现场确认】
 
 ### 3.4 Excel 计划
@@ -140,5 +142,6 @@
 
 | 日期 | 变更 | 作者 |
 |---|---|---|
+| 2026-09-14 | 阶段 3：确认达成率关联键（含产线）与三边界规则；稳定报表编码写入领域模型 | Cursor Cloud 阶段 3 |
 | 2026-09-14 | 阶段 2：补充运行基础设施（健康检查 / 日志脱敏 / Options）；业务口径无变更 | Cursor Cloud 阶段 2 |
 | 2026-09-13 | 阶段 0 初始化：区分 ①②③，统一 Oracle 口径 | Cursor Cloud 阶段 0 |

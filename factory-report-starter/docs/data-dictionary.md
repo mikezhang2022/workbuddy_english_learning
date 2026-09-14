@@ -142,10 +142,10 @@
 
 ---
 
-## 4. 生产计划达成率（`plan_achievement`，组合数据集）
+## 4. 生产计划达成率（`production_plan_achievement` 报表；组合数据集规划码曾写作 `plan_achievement`）
 
 **用途**：MES（或 Fake）实际产量 + Excel 已发布计划 → 达成率。  
-**关联键（开发默认，正式口径待确认）**：FactoryId + WorkshopId + ProductionDate + ProductCode。  
+**关联键（已确认）**：FactoryId + WorkshopId + ProductionLineId + ProductionDate + ProductCode。  
 **组织权限**：同时应用于 MES 实际与 Excel 计划两侧。
 
 | 中文名称 | 稳定英文编码 | 规划类型 | 单位 | 业务定义 | 计算公式 | 来源系统 | 来源表/视图.字段 | 更新频率 | 可作为筛选 | 权限字段 |
@@ -166,9 +166,9 @@
 
 | 场景 | 规划处理 | 状态 |
 |---|---|---|
-| 只有计划无实际 | 实际按 0 或空【待现场确认】；Fake 临时：实际=0，达成率=0% | Fake 临时 / 【待现场确认】 |
-| 只有实际无计划 | 计划空，达成率「—」 | Fake 临时 / 【待现场确认】 |
-| 计划为 0 | 达成率「—」或特殊标记 | Fake 临时：显示「—」 |
+| 只有计划无实际 | 实际=0，达成率=0% | **已确认**（领域 `PlanAchievementStatus.MissingActual`） |
+| 只有实际无计划 | 「未配置计划」，达成率 null | **已确认**（`PlanNotConfigured`） |
+| 计划为 0 | 达成率 null | **已确认**（`PlanIsZero`） |
 | 重复计划键 | 导入校验拒绝；历史脏数据【待现场确认】 | 导入侧拒绝 |
 
 ---
@@ -222,7 +222,7 @@
 | 生产日报 | production_daily | 是 |
 | 工单进度 | work_order_progress | 是 |
 | 质量统计 | quality_statistics | 是 |
-| 计划达成 | plan_achievement | 是 |
+| 计划达成 | production_plan_achievement（报表稳定编码；旧规划码 plan_achievement） | 是 |
 | 月度计划 Excel | monthly_production_plan | 是 |
 
 未知来源一律【待现场确认】，未将未知项标为已确认。
