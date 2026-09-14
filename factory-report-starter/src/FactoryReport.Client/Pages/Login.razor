@@ -17,7 +17,7 @@
                           InputType="InputType.Text"
                           Required="true"
                           RequiredError="请输入用户名"
-                          InputAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "username" })"
+                          UserAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "username" })"
                           Immediate="true"
                           Class="mb-3" />
             <MudTextField @bind-Value="_model.Password"
@@ -25,7 +25,7 @@
                           InputType="InputType.Password"
                           Required="true"
                           RequiredError="请输入密码"
-                          InputAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "current-password" })"
+                          UserAttributes="@(new Dictionary<string, object> { ["autocomplete"] = "current-password" })"
                           Class="mb-3" />
 
             @if (!string.IsNullOrEmpty(_error))
