@@ -1,12 +1,10 @@
-using FactoryReport.Infrastructure;
 using FactoryReport.Worker;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 ConfigureWorkerLogging(builder);
 
-builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<Worker>();
+builder.Services.AddWorkerServices(builder.Configuration);
 
 var host = builder.Build();
 host.Run();

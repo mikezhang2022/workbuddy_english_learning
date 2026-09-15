@@ -1,5 +1,4 @@
 using FactoryReport.Client.Services.Api;
-using Microsoft.AspNetCore.Components.Authorization;
 
 namespace FactoryReport.Client.Services.Auth;
 
@@ -17,10 +16,9 @@ public interface IAuthSessionService
 
 /// <summary>
 /// 进程内会话状态；CSRF 仅存内存，不写入 Web Storage。
+/// 通过 <see cref="SessionChanged"/> 单向通知认证状态提供者，避免与 AuthenticationStateProvider 循环依赖。
 /// </summary>
-public sealed class AuthSessionService(
-    AuthApiClient authApiClient,
-    AuthenticationStateProvider authenticationStateProvider) : IAuthSessionService
+public sealed class AuthSessionService(AuthApiClient authApiClient) : IAuthSessionService
 {
     private string? _csrfToken;
 
@@ -69,10 +67,16 @@ public sealed class AuthSessionService(
         {
             var csrf = _csrfToken
                        ?? await authApiClient.RefreshCsrfTokenAsync(cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(csrf))
+            if (string.IsNullOrWhiteSpace(csrf))
             {
-                await authApiClient.LogoutAsync(csrf, cancellationToken).ConfigureAwait(false);
+                throw new ApiRequestException(new ApiProblemDetails
+                {
+                    Detail = "无法获取 CSRF 令牌，退出登录失败。请刷新页面后重试。",
+                    Status = 400
+                });
             }
+
+            await authApiClient.LogoutAsync(csrf, cancellationToken).ConfigureAwait(false);
         }
 
         ClearLocalSession();
@@ -85,12 +89,5 @@ public sealed class AuthSessionService(
         NotifyChanged();
     }
 
-    private void NotifyChanged()
-    {
-        SessionChanged?.Invoke();
-        if (authenticationStateProvider is CookieAuthenticationStateProvider cookieProvider)
-        {
-            cookieProvider.NotifyAuthenticationStateChanged();
-        }
-    }
+    private void NotifyChanged() => SessionChanged?.Invoke();
 }

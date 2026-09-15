@@ -51,12 +51,14 @@ public static class DependencyInjection
         services.AddSingleton<IProductionRecordReadRepository, FakeProductionRecordReadRepository>();
         services.AddSingleton<IDailyProductionPlanReadRepository, FakeDailyProductionPlanReadRepository>();
         services.AddSingleton<IImportBatchReadRepository, FakeImportBatchReadRepository>();
-        services.AddSingleton<IReportDataQueryService, ReportDataQueryService>();
-        services.AddSingleton<IProductionDailyReportService, ProductionDailyReportService>();
-        services.AddSingleton<IWorkOrderProgressReportService, WorkOrderProgressReportService>();
-        services.AddSingleton<IQualityStatisticsReportService, QualityStatisticsReportService>();
-        services.AddSingleton<IProductionPlanAchievementReportService, ProductionPlanAchievementReportService>();
-        services.AddSingleton<IMonthlyProductionPlanReportService, MonthlyProductionPlanReportService>();
+        // Scoped：报表服务依赖 Scoped 的 IReportQueryScopeService / ICurrentUserAccessor，
+        // 不可注册为 Singleton，否则 Development ValidateScopes 会失败。
+        services.AddScoped<IReportDataQueryService, ReportDataQueryService>();
+        services.AddScoped<IProductionDailyReportService, ProductionDailyReportService>();
+        services.AddScoped<IWorkOrderProgressReportService, WorkOrderProgressReportService>();
+        services.AddScoped<IQualityStatisticsReportService, QualityStatisticsReportService>();
+        services.AddScoped<IProductionPlanAchievementReportService, ProductionPlanAchievementReportService>();
+        services.AddScoped<IMonthlyProductionPlanReportService, MonthlyProductionPlanReportService>();
 
         // 阶段 10：本地账号认证。
         // Fake：进程内测试账号（Development/Testing）。

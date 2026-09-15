@@ -10,7 +10,20 @@
 <CascadingAuthenticationState>
     @if (!_ready)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="app-boot-progress" />
+        @if (!string.IsNullOrEmpty(_initError))
+        {
+            <MudPaper Class="pa-6 ma-4" Elevation="0">
+                <MudText Typo="Typo.h6" Color="Color.Error">应用初始化失败</MudText>
+                <MudText Typo="Typo.body2" Class="mt-2">@_initError</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="RetryInitializeAsync">
+                    重试
+                </MudButton>
+            </MudPaper>
+        }
+        else
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="app-boot-progress" />
+        }
     }
     else
     {
@@ -36,6 +49,7 @@
 
 @code {
     private bool _ready;
+    private string? _initError;
 
     private readonly MudTheme _theme = new()
     {
@@ -48,8 +62,30 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await OnlineStatus.InitializeAsync();
-        await AuthSession.InitializeAsync();
-        _ready = true;
+        await InitializeAppAsync();
+    }
+
+    private async Task RetryInitializeAsync()
+    {
+        await InitializeAppAsync();
+    }
+
+    private async Task InitializeAppAsync()
+    {
+        _initError = null;
+        _ready = false;
+        try
+        {
+            await OnlineStatus.InitializeAsync();
+            await AuthSession.InitializeAsync();
+            _ready = true;
+        }
+        catch (Exception ex)
+        {
+            _initError = string.IsNullOrWhiteSpace(ex.Message)
+                ? "初始化过程中发生未知错误。"
+                : ex.Message;
+            _ready = false;
+        }
     }
 }

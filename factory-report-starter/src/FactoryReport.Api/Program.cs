@@ -28,7 +28,8 @@ if (mobileClientOrigins.Length > 0)
                 .WithOrigins(mobileClientOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
-                .AllowCredentials());
+                .AllowCredentials()
+                .WithExposedHeaders(FactoryReportAuthDefaults.AntiforgeryHeaderName));
     });
 }
 

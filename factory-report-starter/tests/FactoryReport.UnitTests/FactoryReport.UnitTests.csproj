@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\FactoryReport.Application\FactoryReport.Application.csproj" />
     <ProjectReference Include="..\..\src\FactoryReport.Infrastructure\FactoryReport.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\FactoryReport.Client\FactoryReport.Client.csproj" />
+    <ProjectReference Include="..\..\src\FactoryReport.Worker\FactoryReport.Worker.csproj" />
   </ItemGroup>
 
 </Project>

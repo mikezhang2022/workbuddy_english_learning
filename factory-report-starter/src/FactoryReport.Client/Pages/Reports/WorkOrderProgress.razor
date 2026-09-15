@@ -147,8 +147,8 @@
 </MudPaper>
 
 <ReportQueryFeedback IsLoading="_loading"
-                     ErrorMessage="_errorMessage"
-                     CorrelationId="_errorCorrelationId"
+                     ErrorMessage="@_errorMessage"
+                     CorrelationId="@_errorCorrelationId"
                      ShowEmpty="_hasQueried && _response is not null && _response.Rows.Count == 0 && string.IsNullOrEmpty(_errorMessage)"
                      EmptyMessage="当前筛选条件下无数据。" />
 
