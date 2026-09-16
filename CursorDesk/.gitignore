@@ -1,0 +1,9 @@
+# Never commit API keys or local session databases
+key.txt
+*.db
+*.db-journal
+
+# Build output
+bin/
+obj/
+*.user
