@@ -187,8 +187,8 @@
 
         <MudText Typo="Typo.subtitle2" Class="mb-2">明细（@_response.Rows.Count 行）</MudText>
 
-        <div class="report-rows-desktop d-none d-md-block">
-            <MudTable Items="_response.Rows" Dense="true" Hover="true" Breakpoint="Breakpoint.None" Class="report-table">
+        <div class="report-rows-desktop d-none d-md-block" role="region" aria-label="生产日报明细表（可横向滚动）">
+            <MudTable Items="_response.Rows" Dense="true" Hover="true" Breakpoint="Breakpoint.None" Class="report-table" Style="min-width: 720px;">
                 <HeaderContent>
                     <MudTh>生产日</MudTh>
                     <MudTh>工厂</MudTh>
