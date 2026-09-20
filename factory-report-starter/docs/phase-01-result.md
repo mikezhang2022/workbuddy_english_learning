@@ -11,9 +11,10 @@
 | 子项目 | `factory-report-starter/` |
 | 开发分支 | `feat/bi-commercial-phase-01` |
 | 基线起点（main） | `62b2cbf`（`fix: break Blazor auth DI cycle that froze Client on loading`） |
-| 最终提交号 | `a730cdf65bc7e93c3ec813f65dff18458f62ffa8`（功能基线 `8c1d33c`） |
+| 最终提交号 | `0c1aee02e6849a1106eb649470760eb58f735d2b`（功能基线 `8c1d33c`） |
 | Cloud Agent | https://cursor.com/agents/bc-7ba8eb4b-88a0-41f6-9c24-a5437165de46 |
-| PR | （推送后由 ManagePullRequest 创建/更新） |
+| PR | https://github.com/mikezhang2022/workbuddy_english_learning/pull/4 |
+| 同源 Agent 分支 | `cursor/bi-2a49`（与 `feat/bi-commercial-phase-01` 同 tip；评审请以 feat 分支为准） |
 
 ## 2. 复用与本阶段变更
 
