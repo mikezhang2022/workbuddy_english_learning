@@ -11,9 +11,9 @@
 | 子项目 | `factory-report-starter/` |
 | 开发分支 | `feat/bi-commercial-phase-01` |
 | 基线起点（main） | `62b2cbf`（`fix: break Blazor auth DI cycle that froze Client on loading`） |
-| 最终提交号 | （以本分支最新 commit 为准，见 Git） |
+| 最终提交号 | `8c1d33c531ee4dcedea19ce61958ee7752a1fc74` |
 | Cloud Agent | https://cursor.com/agents/bc-7ba8eb4b-88a0-41f6-9c24-a5437165de46 |
-| PR | 见下方推送后链接 |
+| PR | （推送后由 ManagePullRequest 创建/更新） |
 
 ## 2. 复用与本阶段变更
 
