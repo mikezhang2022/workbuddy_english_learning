@@ -1,0 +1,37 @@
+@page "/reports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>报表列表 - 工厂报表</PageTitle>
+<h1 class="visually-hidden">报表列表</h1>
+
+<MudText Typo="Typo.h6" GutterBottom="true">报表列表</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    当前环境为演示数据 / Fake。查询由服务端执行，浏览器不持有数据库凭据。
+</MudText>
+
+<div class="report-list">
+    @foreach (var item in ReportLinks)
+    {
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Href="@item.Href"
+                   Class="report-list-item mb-2"
+                   StartIcon="@item.Icon">
+            @item.Title
+        </MudButton>
+    }
+</div>
+
+@code {
+    private sealed record ReportLink(string Href, string Title, string Icon);
+
+    private static readonly ReportLink[] ReportLinks =
+    [
+        new("/reports/production-daily", "生产日报", Icons.Material.Filled.Today),
+        new("/reports/work-order-progress", "工单进度", Icons.Material.Filled.Assignment),
+        new("/reports/quality-statistics", "质量统计", Icons.Material.Filled.FactCheck),
+        new("/reports/production-plan-achievement", "计划达成", Icons.Material.Filled.TrendingUp),
+        new("/reports/monthly-production-plan", "月度生产计划", Icons.Material.Filled.CalendarMonth)
+    ];
+}

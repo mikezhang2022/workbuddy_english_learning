@@ -134,7 +134,7 @@ API 读取日计划 + 生产事实后按键组合；**不得**用月计划平均
 
 | 位置 | 说明 |
 |---|---|
-| `Infrastructure/DependencyInjection.cs` | 当前强制注册 Fake 仓储与 `ReportDataQueryService`；未来按 `DataMode=Oracle` 切换 |
+| `Infrastructure/DependencyInjection.cs` | `DataMode=Fake` 注册 Fake；**`DataMode=Oracle` 本阶段显式抛错（禁止静默回退 Fake）**；未来实现后按模式切换 |
 | `Infrastructure/Fake/*` | 现行 Fake 实现与 `DeterministicFakeFixture` |
 | `Infrastructure/Persistence/Oracle/OraclePersistencePlaceholder.cs` | Oracle 接入目录占位；列出待实现仓储接口名 |
 | 配置 | `FactoryReport:DataMode`（默认 `Fake`）；真实连接串不得入库 |
