@@ -11,7 +11,7 @@
 | 子项目 | `factory-report-starter/` |
 | 基线 tip | `86a1776`（第一阶段 PR #4 头） |
 | 开发分支 | `cursor/bc-82b70fdf-f902-46e4-b16b-d2db46a0e6da-7c2f`（基于 `cursor/bi-2a49` tip，未 rebase） |
-| 最终提交号 | `5bbc2ceb8b0e20b622fd8fa41042dfb9dd6ce426` |
+| 最终提交号 | `e67393140b680a6d72d339cd21bffb66a9ee27b8`（功能基线 `5bbc2ce`） |
 | PR | https://github.com/mikezhang2022/workbuddy_english_learning/pull/5 （草稿） |
 
 ## 2. 复用与本阶段变更
@@ -81,7 +81,19 @@ dotnet test FactoryReport.sln
 
 ## 5. 手工验证摘要
 
-见本文件后续「验证证据」与交付说明（API 上传→校验→发布→回退；401/403；PC/390px 截图）。
+| 场景 | 结果 | 层级 |
+|------|------|------|
+| API 上传→校验→发布→回退 | 201/200/200/200；回退恢复夹具 Active 版本 | 测试已通过 |
+| 未登录列表 | 401 | 测试已通过 |
+| Viewer 上传 / 越权工厂 | 403（集成测试） | 测试已通过 |
+| PC `/imports` | 模板/上传/批次列表可见 | 测试已通过 |
+| 390px `/imports` | `scrollWidth==clientWidth==390`；只读提示 | 测试已通过 |
+
+截图产物：
+
+- `/opt/cursor/artifacts/pc-imports-list.png`
+- `/opt/cursor/artifacts/pc-import-batch-detail.png`
+- `/opt/cursor/artifacts/mobile-390-imports.png`
 
 ## 6. 干净环境跑通导入
 
