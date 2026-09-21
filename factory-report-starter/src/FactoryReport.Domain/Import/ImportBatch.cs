@@ -86,6 +86,30 @@ public sealed class ImportBatch
         CreatedAtUtc = createdAtUtc;
         CompletedAtUtc = completedAtUtc;
     }
+
+    /// <summary>成功行数（总数 − 错误行）；未知时为 null。</summary>
+    public int? SuccessRows =>
+        TotalRows is null || ErrorRows is null
+            ? null
+            : Math.Max(0, TotalRows.Value - ErrorRows.Value);
+
+    public ImportBatch WithStatus(
+        ImportBatchStatus status,
+        DatasetPublishStatus? targetPublishStatus = null,
+        int? totalRows = null,
+        int? errorRows = null,
+        UtcInstant? completedAtUtc = null)
+        => new(
+            Id,
+            FactoryId,
+            DatasetCode,
+            status,
+            CreatedAtUtc,
+            targetPublishStatus ?? TargetPublishStatus,
+            SourceFileName,
+            totalRows ?? TotalRows,
+            errorRows ?? ErrorRows,
+            completedAtUtc ?? CompletedAtUtc);
 }
 
 /// <summary>

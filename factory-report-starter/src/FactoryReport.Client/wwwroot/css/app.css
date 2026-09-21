@@ -285,3 +285,58 @@ html, body {
     padding: 0.75rem 0;
 }
 
+/* Excel 导入 */
+.import-toolbar,
+.import-upload-row,
+.import-template-actions,
+.import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    max-width: 100%;
+}
+
+.import-factory-select,
+.import-dataset-select {
+    min-width: 12rem;
+    max-width: 100%;
+}
+
+.import-file-input {
+    max-width: 100%;
+}
+
+.import-batch-list,
+.import-error-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 100%;
+}
+
+.import-batch-item,
+.import-error-item {
+    background: #fff;
+    border: 1px solid #d7dde3;
+    padding: 0.75rem;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.import-error-item {
+    cursor: default;
+    font-size: 0.9rem;
+}
+
+.import-batch-title {
+    font-weight: 600;
+}
+
+.import-batch-meta,
+.import-error-raw {
+    color: #5a6570;
+    font-size: 0.85rem;
+}
+

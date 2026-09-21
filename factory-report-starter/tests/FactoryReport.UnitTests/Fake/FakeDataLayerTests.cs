@@ -74,8 +74,8 @@ public class FakeRepositoryIsolationAndFilterTests
             new FakeProductReadRepository(snapshot),
             new FakeWorkOrderReadRepository(snapshot),
             new FakeProductionRecordReadRepository(snapshot),
-            new FakeDailyProductionPlanReadRepository(snapshot),
-            new FakeImportBatchReadRepository(snapshot));
+            new FakeDailyProductionPlanReadRepository(snapshot, new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)),
+            new FakeImportBatchReadRepository(new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)));
     }
 
     [Fact]
@@ -193,8 +193,8 @@ public class FakePlanActualBoundaryScenarioTests
             new FakeProductReadRepository(snapshot),
             new FakeWorkOrderReadRepository(snapshot),
             new FakeProductionRecordReadRepository(snapshot),
-            new FakeDailyProductionPlanReadRepository(snapshot),
-            new FakeImportBatchReadRepository(snapshot));
+            new FakeDailyProductionPlanReadRepository(snapshot, new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)),
+            new FakeImportBatchReadRepository(new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)));
     }
 
     private static async Task<(decimal? Plan, decimal? Actual, ProductionQuantitiesSnapshot? Qty)> LoadPlanActualAsync(

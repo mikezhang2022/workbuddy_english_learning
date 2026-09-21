@@ -1,6 +1,7 @@
 using FactoryReport.Application.Abstractions;
 using FactoryReport.Application.Configuration;
 using FactoryReport.Application.DataAccess;
+using FactoryReport.Application.Import;
 using FactoryReport.Application.Reporting.MonthlyProductionPlan;
 using FactoryReport.Application.Reporting.ProductionDaily;
 using FactoryReport.Application.Reporting.ProductionPlanAchievement;
@@ -8,7 +9,9 @@ using FactoryReport.Application.Reporting.QualityStatistics;
 using FactoryReport.Application.Reporting.WorkOrderProgress;
 using FactoryReport.Application.Security;
 using FactoryReport.Application.Security.DataScope;
+using FactoryReport.Infrastructure.Excel;
 using FactoryReport.Infrastructure.Fake;
+using FactoryReport.Infrastructure.Import;
 using FactoryReport.Infrastructure.Options;
 using FactoryReport.Infrastructure.Security;
 using FactoryReport.Infrastructure.Time;
@@ -59,6 +62,10 @@ public static class DependencyInjection
 
         // 确定性夹具快照（进程内单例）；『仅用于开发测试，不代表现场 MES 正式口径』。
         services.AddSingleton(_ => DeterministicFakeFixture.Create());
+
+        services.AddSingleton<IImportBatchWorkspace, FakeImportBatchWorkspace>();
+        services.AddSingleton<IExcelWorkbookService, MiniExcelWorkbookService>();
+        services.AddScoped<IExcelImportService, ExcelImportService>();
 
         services.AddSingleton<IOrganizationReadRepository, FakeOrganizationReadRepository>();
         services.AddSingleton<IProductReadRepository, FakeProductReadRepository>();

@@ -63,6 +63,16 @@ dotnet test tests/FactoryReport.UnitTests/FactoryReport.UnitTests.csproj
 dotnet test tests/FactoryReport.IntegrationTests/FactoryReport.IntegrationTests.csproj
 ```
 
+CI（仓库根）：`.github/workflows/factory-report-starter.yml` —— 仅当 `factory-report-starter/**` 变更时触发；步骤为 checkout → .NET 10 → restore → build → test。不含 Docker/生产部署。
+
+## 3.1 新增依赖（第二阶段）
+
+| 包 | 版本 | 项目 | 用途 |
+|----|------|------|------|
+| MiniExcel | 1.41.3 | Infrastructure | xlsx 模板与解析（Apache-2.0） |
+
+详见 `docs/third-party-components.md`、`docs/excel-import.md`。
+
 ## 4. 启动（Fake 开发路径）
 
 终端 A — API（默认端口 **5161**）：
@@ -125,6 +135,21 @@ curl -s -b /tmp/fr.cookie \
 # 未登录 → 401
 curl -s -o /dev/null -w "%{http_code}\n" \
   "http://localhost:5161/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+```
+
+### Excel 导入（第二阶段）
+
+浏览器：登录后打开 `/imports`（PC 可上传/校验/发布/回退；手机只读列表/详情）。  
+API 契约见 `docs/excel-import.md`。手工 curl 需先取 CSRF（登录响应头或 `GET /api/v1/auth/csrf`），再 `multipart` 上传。
+
+```bash
+# 模板下载（需登录 Cookie）
+curl -s -b /tmp/fr.cookie -o /tmp/plan-template.xlsx \
+  "http://127.0.0.1:5161/api/v1/imports/templates/monthly_production_plan/download"
+
+# 未登录上传 → 401
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  "http://127.0.0.1:5161/api/v1/imports/batches"
 ```
 
 浏览器：打开 `http://127.0.0.1:5269/login`（或 `http://localhost:5269/login`）。

@@ -93,6 +93,21 @@ public static class FactoryReportAuthenticationExtensions
                     AppRoles.Viewer));
 
             options.AddPolicy(
+                AuthorizationPolicies.ImportRead,
+                policy => policy.RequireRole(
+                    AppRoles.SystemAdmin,
+                    AppRoles.FactoryAdmin,
+                    AppRoles.ProductionManager,
+                    AppRoles.QualityUser,
+                    AppRoles.Viewer));
+
+            options.AddPolicy(
+                AuthorizationPolicies.ImportManage,
+                policy => policy.RequireRole(
+                    AppRoles.SystemAdmin,
+                    AppRoles.FactoryAdmin));
+
+            options.AddPolicy(
                 AuthorizationPolicies.CanViewProductionReports,
                 policy => policy.RequireRole(
                     AppRoles.SystemAdmin,

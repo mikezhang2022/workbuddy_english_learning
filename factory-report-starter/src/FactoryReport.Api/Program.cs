@@ -14,6 +14,15 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = FactoryReport.Application.Import.ExcelImportOptions.MaxFileBytes;
+});
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = FactoryReport.Application.Import.ExcelImportOptions.MaxFileBytes;
+});
+
 var mobileClientOrigins = builder.Configuration
     .GetSection(FactoryReportOptions.SectionName)
     .Get<FactoryReportOptions>()?.MobileClientAllowedOrigins ?? [];
@@ -88,6 +97,9 @@ app.MapWorkOrderProgressReportEndpoints();
 app.MapQualityStatisticsReportEndpoints();
 app.MapProductionPlanAchievementReportEndpoints();
 app.MapMonthlyProductionPlanReportEndpoints();
+
+// Excel 导入流水线（商业化第二阶段）：模板 / 上传 / 校验 / 发布 / 回退。Fake 存储，不写 Oracle 业务表。
+app.MapExcelImportEndpoints();
 
 app.MapGet("/health", (IDataAccessModeProvider modeProvider, IPlaceholderDataStore store) =>
 {

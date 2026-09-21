@@ -26,8 +26,8 @@ public class ProductionPlanAchievementReportServiceTests
             new FakeProductReadRepository(snapshot),
             new FakeWorkOrderReadRepository(snapshot),
             new FakeProductionRecordReadRepository(snapshot),
-            new FakeDailyProductionPlanReadRepository(snapshot),
-            new FakeImportBatchReadRepository(snapshot));
+            new FakeDailyProductionPlanReadRepository(snapshot, new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)),
+            new FakeImportBatchReadRepository(new FactoryReport.Infrastructure.Import.FakeImportBatchWorkspace(snapshot)));
 
         return new ProductionPlanAchievementReportService(
             query,

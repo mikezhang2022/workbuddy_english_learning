@@ -127,13 +127,16 @@ Browser (Client) --HTTPS/HTTP+Cookie--> Api --(Fake 仓储 | 未来 Oracle 仓�
 
 设计文档：`oracle-integration-plan.md`、`oracle-schema-design.md`、`oracle-site-questionnaire.md`。
 
-## 8. Excel 导入边界（本阶段）
+## 8. Excel 导入边界
 
-| 已有 | 未有 |
-|------|------|
-| `ImportBatch` / `DatasetVersionState` 领域模型 | HTTP 上传、解析、校验 UI |
-| `IImportBatchReadRepository` + Fake 实现 | 发布/激活/回退流水线 |
-| 月度计划 Fake 版本过滤（Published/Active） | 真实 Excel 文件处理 |
+| 已实现（第二阶段） | 仍未实现 |
+|--------------------|----------|
+| 模板下载、上传解析、逐行校验报告 | Oracle 应用 Schema 持久化 |
+| `ImportBatch` / `DatasetVersionState` 生命周期（发布/激活/回退） | 实际导入驱动计划达成正式对比接线 |
+| Fake 内存工作区（不写 Oracle 业务表） | 正式唯一键 / ReplaceScope【待现场确认】 |
+| PC 导入 UI；手机只读 | Admin 专用导入台 |
+
+详见 `docs/excel-import.md`、`docs/phase-02-result.md`。
 
 样例字段：`Id, FactoryId, DatasetCode, Status, SourceFileName, TotalRows, ErrorRows, CreatedAtUtc, CompletedAtUtc`（见 Domain）。正式模板与唯一键【待现场确认】。
 

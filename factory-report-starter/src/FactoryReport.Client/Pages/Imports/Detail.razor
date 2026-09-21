@@ -1,0 +1,165 @@
+@page "/imports/{BatchId:guid}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ImportApiClient ImportApi
+@inject IAuthSessionService AuthSession
+@inject NavigationManager Navigation
+
+<PageTitle>导入批次详情 - 工厂报表</PageTitle>
+
+<MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/imports" Class="mb-2">返回列表</MudButton>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_detail is null)
+{
+    <MudAlert Severity="Severity.Warning">未找到批次。</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h6" GutterBottom="true">@_detail.DatasetDisplayName</MudText>
+    <MudText Typo="Typo.body2">状态：@_detail.LifecycleLabel（@_detail.Status）</MudText>
+    <MudText Typo="Typo.body2">文件：@(_detail.SourceFileName ?? "—")</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        总数 @_detail.TotalRows · 成功 @_detail.SuccessRows · 失败 @_detail.ErrorRows
+        @if (!string.IsNullOrWhiteSpace(_detail.PublishedVersionNo))
+        {
+            <text> · 版本 @_detail.PublishedVersionNo</text>
+        }
+    </MudText>
+
+    <div class="d-none d-md-flex import-actions mb-3">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ValidateAsync" Disabled="_busy">校验</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="PublishAsync" Disabled="_busy || !_detail.CanPublish">发布</MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Warning" OnClick="RollbackAsync" Disabled="_busy || !_detail.CanRollback">回退</MudButton>
+    </div>
+    <div class="d-md-none mb-3">
+        <MudAlert Severity="Severity.Info" Dense="true">手机端只读；写入操作请使用电脑端。</MudAlert>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <MudAlert Severity="@_messageSeverity" Class="mb-3" Dense="true">@_message</MudAlert>
+    }
+
+    <MudText Typo="Typo.subtitle2" Class="mb-2">错误明细</MudText>
+    @if (_detail.Errors.Count == 0)
+    {
+        <MudText Typo="Typo.body2">无行级错误。</MudText>
+    }
+    else
+    {
+        <div class="import-error-list">
+            @foreach (var err in _detail.Errors)
+            {
+                <div class="import-error-item">
+                    <strong>行 @err.RowNumber</strong> · @err.ColumnName · @err.Reason
+                    @if (!string.IsNullOrWhiteSpace(err.RawValue))
+                    {
+                        <span class="import-error-raw">（@err.RawValue）</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid BatchId { get; set; }
+
+    private ImportBatchDetailDto? _detail;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _message;
+    private Severity _messageSeverity = Severity.Info;
+
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _detail = await ImportApi.GetBatchAsync(BatchId);
+        }
+        catch (ApiRequestException ex)
+        {
+            _detail = null;
+            _message = ex.Problem.Detail ?? "加载失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ValidateAsync()
+    {
+        _busy = true;
+        try
+        {
+            var csrf = await AuthSession.EnsureCsrfTokenAsync();
+            var report = await ImportApi.ValidateAsync(BatchId, csrf);
+            _message = $"校验完成：成功 {report.SuccessRows}，失败 {report.ErrorRows}。";
+            _messageSeverity = report.ErrorRows == 0 ? Severity.Success : Severity.Warning;
+            await ReloadAsync();
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "校验失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task PublishAsync()
+    {
+        _busy = true;
+        try
+        {
+            var csrf = await AuthSession.EnsureCsrfTokenAsync();
+            var result = await ImportApi.PublishAsync(BatchId, csrf);
+            _message = $"已发布并激活版本 {result.VersionNo}。";
+            _messageSeverity = Severity.Success;
+            await ReloadAsync();
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "发布失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RollbackAsync()
+    {
+        _busy = true;
+        try
+        {
+            var csrf = await AuthSession.EnsureCsrfTokenAsync();
+            var result = await ImportApi.RollbackAsync(BatchId, csrf);
+            _message = result.ReactivatedVersionNo is null
+                ? "已回退当前版本。"
+                : $"已回退；重新激活 {result.ReactivatedVersionNo}。";
+            _messageSeverity = Severity.Success;
+            await ReloadAsync();
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "回退失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

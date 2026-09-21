@@ -34,6 +34,7 @@ public static class ClientServiceCollectionExtensions
 
         services.AddScoped<AuthApiClient>();
         services.AddScoped<ReportsApiClient>();
+        services.AddScoped<ImportApiClient>();
         services.AddScoped<IAuthSessionService, AuthSessionService>();
         services.AddScoped<CookieAuthenticationStateProvider>();
         services.AddScoped<AuthenticationStateProvider>(sp =>
