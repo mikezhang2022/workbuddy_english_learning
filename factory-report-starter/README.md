@@ -4,11 +4,12 @@
 
 本目录 `factory-report-starter/` 为工厂报表项目根目录。所有开发与文档改动仅限本目录及其子目录。
 
-## 当前状态（阶段 18 完成）
+## 当前状态（商业化第一阶段基线）
 
-阶段 18：**Oracle 现场接入准备与持久化设计（纯文档）**。新增接入计划、应用 Schema 逻辑设计、现场问卷；**不连接 Oracle、不实现持久化、不改业务 API**。详见 `docs/oracle-integration-plan.md`、`docs/oracle-schema-design.md`、`docs/oracle-site-questionnaire.md`。
+商业化 **phase-01** 已建立可复现 Fake 开发基线（文档见 `docs/current-state.md`、`docs/development.md`、`docs/phase-01-result.md`）。  
+**现阶段仍只运行 Fake 模式**；`DataMode=Oracle` / `AccountStore=Oracle` **未实现且启动显式失败**（禁止静默回退 Fake）。真实 Oracle 须现场实现。
 
-**现阶段仍只运行 Fake 模式**（进程内确定性夹具 + Fake 测试账号，不连接任何数据库）。真实 Oracle 接入必须在工厂现场完成；连接信息通过 **环境变量 / ASP.NET Core 配置与 Secret（密钥管理）** 注入，**不得进入 Git**（禁止提交连接串、密码、Wallet、证书私钥）。
+阶段 18：**Oracle 现场接入准备与持久化设计（纯文档）** 仍保留。详见 `docs/oracle-integration-plan.md` 等。
 
 阶段 17：**月度生产计划移动端查询页**（`/reports/monthly-production-plan`）。详见 `docs/ui-monthly-production-plan.md`。
 
@@ -111,21 +112,23 @@ dotnet test tests/FactoryReport.IntegrationTests/FactoryReport.IntegrationTests.
 ## 本地运行与健康检查
 
 ```bash
-dotnet run --project src/FactoryReport.Api --urls http://localhost:5000
+dotnet run --project src/FactoryReport.Api --urls http://127.0.0.1:5161
 dotnet run --project src/FactoryReport.Worker
 dotnet run --project src/FactoryReport.Admin
-dotnet run --project src/FactoryReport.Client
+dotnet run --project src/FactoryReport.Client --urls http://127.0.0.1:5269
 ```
+
+端口以各项目 `Properties/launchSettings.json` 为准（Api 默认 **5161**，Client 默认 **5269**）。浏览器主机名须与 `FactoryReportClient:ApiBaseUrl` 一致，见 `docs/development.md`。
 
 移动 PWA 需 API 与 Client 同时运行，且 Development 下 API 的 `FactoryReport:MobileClientAllowedOrigins` 需包含 Client 源（见 `appsettings.Development.json`）。详见 `docs/mobile-pwa.md`。
 
 验证健康检查（另开终端）：
 
 ```bash
-curl -s http://localhost:5000/health
-curl -s http://localhost:5000/health/live
-curl -s http://localhost:5000/health/ready
-curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready -o /dev/null
+curl -s http://localhost:5161/health
+curl -s http://localhost:5161/health/live
+curl -s http://localhost:5161/health/ready
+curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5161/health/ready -o /dev/null
 ```
 
 期望：`/health/ready` 在 Fake 模式下返回 Healthy，且过程中不连接 Oracle/MES。
@@ -134,40 +137,40 @@ curl -s -D - -H "X-Correlation-ID: demo-001" http://localhost:5000/health/ready 
 
 ```bash
 # 登录后保存 Cookie，并从响应头读取 X-CSRF-TOKEN 供 logout 使用
-curl -s -c /tmp/fr.cookie -D - -X POST http://localhost:5000/api/v1/auth/login \
+curl -s -c /tmp/fr.cookie -D - -X POST http://localhost:5161/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"userName":"sysadmin","password":"<见测试代码 DevPassword_SystemAdmin>"}'
-curl -s -b /tmp/fr.cookie http://localhost:5000/api/v1/auth/me
+curl -s -b /tmp/fr.cookie http://localhost:5161/api/v1/auth/me
 ```
 
 生产日报示例（需先登录；Fake 夹具日期；`factoryId` 仍必填）：
 
 ```bash
-curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+curl -s -b /tmp/fr.cookie "http://localhost:5161/api/v1/reports/production-daily?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
 ```
 
 工单进度示例：
 
 ```bash
-curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/work-order-progress?factoryId=1&workOrderCode=WO-DEMO-OVERDUE"
+curl -s -b /tmp/fr.cookie "http://localhost:5161/api/v1/reports/work-order-progress?factoryId=1&workOrderCode=WO-DEMO-OVERDUE"
 ```
 
 质量统计示例：
 
 ```bash
-curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/quality-statistics?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
+curl -s -b /tmp/fr.cookie "http://localhost:5161/api/v1/reports/quality-statistics?factoryId=1&startDate=2026-03-10&endDate=2026-03-11"
 ```
 
 生产计划达成示例：
 
 ```bash
-curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/production-plan-achievement?factoryId=1&startDate=2026-03-10&endDate=2026-03-10"
+curl -s -b /tmp/fr.cookie "http://localhost:5161/api/v1/reports/production-plan-achievement?factoryId=1&startDate=2026-03-10&endDate=2026-03-10"
 ```
 
 月度生产计划示例：
 
 ```bash
-curl -s -b /tmp/fr.cookie "http://localhost:5000/api/v1/reports/monthly-production-plan?factoryId=1&planMonth=2026-03"
+curl -s -b /tmp/fr.cookie "http://localhost:5161/api/v1/reports/monthly-production-plan?factoryId=1&planMonth=2026-03"
 ```
 
 配置示例见各宿主项目的 `appsettings.Example.json`。禁止提交真实密码、Token、连接字符串或 Oracle Wallet。

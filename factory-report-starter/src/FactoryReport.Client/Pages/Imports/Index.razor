@@ -1,0 +1,204 @@
+@page "/imports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ImportApiClient ImportApi
+@inject IAuthSessionService AuthSession
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+
+<PageTitle>数据导入 - 工厂报表</PageTitle>
+
+<MudText Typo="Typo.h6" GutterBottom="true">Excel 数据导入</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    计划 / 实际数据入口。导入数据存于产品 Fake 存储，不写入 Oracle 业务表。手机端仅支持查看。
+</MudText>
+
+<div class="import-toolbar mb-3">
+    <MudSelect T="long?" Label="工厂" Value="_factoryId" ValueChanged="OnFactoryChanged" Dense="true" Class="import-factory-select">
+        @foreach (var opt in _factoryOptions)
+        {
+            <MudSelectItem T="long?" Value="@((long?)opt.Id)">@opt.Label</MudSelectItem>
+        }
+    </MudSelect>
+</div>
+
+<div class="d-none d-md-block mb-4">
+    <MudText Typo="Typo.subtitle2" Class="mb-2">模板下载</MudText>
+    <div class="import-template-actions">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => DownloadTemplateAsync("monthly_production_plan"))" Disabled="_busy">
+            计划数据模板
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => DownloadTemplateAsync("production_actual"))" Disabled="_busy">
+            实际数据模板
+        </MudButton>
+    </div>
+
+    <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">上传</MudText>
+    <div class="import-upload-row">
+        <MudSelect T="string" Label="数据集" @bind-Value="_uploadDatasetCode" Dense="true" Class="import-dataset-select">
+            <MudSelectItem Value="@("monthly_production_plan")">计划数据</MudSelectItem>
+            <MudSelectItem Value="@("production_actual")">实际数据</MudSelectItem>
+        </MudSelect>
+        <InputFile OnChange="OnFileSelected" accept=".xlsx" class="import-file-input" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="UploadAsync" Disabled="_busy || _pendingFile is null || _factoryId is null">
+            上传
+        </MudButton>
+    </div>
+</div>
+
+<div class="d-md-none mb-3">
+    <MudAlert Severity="Severity.Info" Dense="true">
+        手机端仅可查看批次；上传 / 校验 / 发布 / 回退请使用电脑端。
+    </MudAlert>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <MudAlert Severity="@_messageSeverity" Class="mb-3" Dense="true">@_message</MudAlert>
+}
+
+<MudText Typo="Typo.subtitle2" Class="mb-2">批次列表</MudText>
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-3" />
+}
+else if (_batches.Count == 0)
+{
+    <MudText Typo="Typo.body2">暂无导入批次。</MudText>
+}
+else
+{
+    <div class="import-batch-list">
+        @foreach (var batch in _batches)
+        {
+            <div class="import-batch-item" @onclick="@(() => Navigation.NavigateTo($"/imports/{batch.BatchId}"))">
+                <div class="import-batch-title">@batch.DatasetDisplayName · @batch.LifecycleLabel</div>
+                <div class="import-batch-meta">
+                    @(batch.SourceFileName ?? "(无文件名)") · 总 @batch.TotalRows / 成功 @batch.SuccessRows / 失败 @batch.ErrorRows
+                </div>
+                <div class="import-batch-meta">@batch.CreatedAtUtc.ToString("u")</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private long? _factoryId;
+    private IReadOnlyList<OrgOption> _factoryOptions = [];
+    private IReadOnlyList<ImportBatchSummaryDto> _batches = [];
+    private bool _loading = true;
+    private bool _busy;
+    private string _uploadDatasetCode = "monthly_production_plan";
+    private IBrowserFile? _pendingFile;
+    private string? _message;
+    private Severity _messageSeverity = Severity.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _factoryOptions = ReportDataScopeOptions.GetFactoryOptions(AuthSession.CurrentUser?.DataScope);
+        _factoryId = ReportDataScopeOptions.TryAutoSelectFactory(AuthSession.CurrentUser?.DataScope);
+        if (_factoryId is null && _factoryOptions.Count > 0)
+        {
+            _factoryId = _factoryOptions[0].Id;
+        }
+        await ReloadAsync();
+    }
+
+    private async Task OnFactoryChanged(long? value)
+    {
+        _factoryId = value;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_factoryId is null)
+        {
+            _batches = [];
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            _batches = await ImportApi.ListBatchesAsync(_factoryId.Value);
+            _message = null;
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "加载批次失败。";
+            _messageSeverity = Severity.Error;
+            _batches = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _pendingFile = e.File;
+        _message = $"已选择：{e.File.Name}";
+        _messageSeverity = Severity.Info;
+    }
+
+    private async Task DownloadTemplateAsync(string datasetCode)
+    {
+        _busy = true;
+        try
+        {
+            var bytes = await ImportApi.DownloadTemplateAsync(datasetCode);
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"{datasetCode}-template.xlsx";
+            await Js.InvokeVoidAsync(
+                "eval",
+                $@"(function(){{const a=document.createElement('a');a.href='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{base64}';a.download='{fileName}';a.click();}})()");
+            _message = "模板已开始下载。";
+            _messageSeverity = Severity.Success;
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "模板下载失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_factoryId is null || _pendingFile is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var csrf = await AuthSession.EnsureCsrfTokenAsync();
+            await using var stream = _pendingFile.OpenReadStream(ExcelImportOptions.MaxFileBytes);
+            var detail = await ImportApi.UploadAsync(
+                _factoryId.Value,
+                _uploadDatasetCode,
+                _pendingFile.Name,
+                stream,
+                csrf);
+            _message = $"已上传草稿批次 {detail.BatchId:N}。";
+            _messageSeverity = Severity.Success;
+            _pendingFile = null;
+            Navigation.NavigateTo($"/imports/{detail.BatchId}");
+        }
+        catch (ApiRequestException ex)
+        {
+            _message = ex.Problem.Detail ?? "上传失败。";
+            _messageSeverity = Severity.Error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

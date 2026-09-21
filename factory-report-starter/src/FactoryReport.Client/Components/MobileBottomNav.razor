@@ -24,22 +24,28 @@
     private static readonly NavItem[] NavItems =
     [
         new("/", "概览", "概览", Icons.Material.Filled.Home),
+        new("/reports", "报表列表", "报表", Icons.Material.Filled.ListAlt),
         new("/reports/production-daily", "生产日报", "日报", Icons.Material.Filled.Today),
         new("/reports/work-order-progress", "工单进度", "工单", Icons.Material.Filled.Assignment),
         new("/reports/quality-statistics", "质量统计", "质量", Icons.Material.Filled.FactCheck),
-        new("/reports/production-plan-achievement", "计划达成", "达成", Icons.Material.Filled.TrendingUp),
-        new("/reports/monthly-production-plan", "月度计划", "月计划", Icons.Material.Filled.CalendarMonth),
         new("/account", "我的账号", "我的", Icons.Material.Filled.Person)
     ];
 
     private bool IsActive(string href)
     {
-        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri).Trim('/');
         if (href == "/")
         {
-            return string.IsNullOrEmpty(relative) || relative == "/";
+            return string.IsNullOrEmpty(relative);
         }
 
-        return relative.StartsWith(href.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+        var target = href.Trim('/');
+        if (string.Equals(target, "reports", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(relative, "reports", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return relative.Equals(target, StringComparison.OrdinalIgnoreCase)
+               || relative.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase);
     }
 }

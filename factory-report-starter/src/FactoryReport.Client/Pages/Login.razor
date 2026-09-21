@@ -9,6 +9,9 @@
 <MudContainer MaxWidth="MaxWidth.Small" Class="login-container">
     <MudPaper Class="pa-6 login-card" Elevation="4">
         <MudText Typo="Typo.h5" Align="Align.Center" GutterBottom="true">工厂报表</MudText>
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" Variant="Variant.Outlined">
+            演示环境 / Fake 模式。开发账号见 <code>docs/authentication.md</code>（勿用于生产）。
+        </MudAlert>
         <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-4">请使用工厂账号登录</MudText>
 
         <EditForm Model="_model" OnValidSubmit="SubmitAsync">

@@ -1,23 +1,24 @@
-# 架构说明（阶段 6）
+# 架构说明（商业化基线）
 
-## 目录职责
+> 以当前代码为准。更新于商业化第一阶段（2026-09-20）。  
+> 保留既有分层与业务规则；发现口径冲突时记录于 `business-decisions.md`，**不静默更改指标口径**。
+
+## 1. 目录职责
 
 | 路径 | 职责 |
 |------|------|
-| `src/FactoryReport.Domain` | 领域模型与领域规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率、**角色/策略名**）。无基础设施、无 UI、无数据库驱动、无 Fake。详见 `docs/domain-model.md`。 |
-| `src/FactoryReport.Application` | 应用服务、用例接口、DTO/抽象、强类型运行配置 POCOs、`PlanAchievementEvaluator` / `IUtcClock`、数据访问只读仓储抽象与 `IReportDataQueryService`、报表服务、**认证与数据范围抽象**（`ICurrentUserAccessor` / `ILocalAccountStore` / `IUserScopeResolver` / `IReportQueryScopeService`）。只依赖 Domain。 |
-| `src/FactoryReport.Infrastructure` | 技术实现：Fake 确定性夹具与内存仓储、**Fake 本地账号（含数据范围）**、PBKDF2 密码哈希、Options 校验、UTC 时钟、未来 Oracle 持久化占位。依赖 Application + Domain。详见 `docs/fake-data.md`、`docs/authentication.md`、`docs/authorization-and-data-scope.md`。 |
-| `src/FactoryReport.Api` | ASP.NET Core HTTP API：健康检查、ProblemDetails、Correlation ID、结构化日志、**Cookie 认证与 Antiforgery**、认证端点、只读报表端点。 |
-| `src/FactoryReport.Client` | Blazor WebAssembly PWA 手机端空壳。依赖 Application（共享契约），不依赖 Admin/Api 项目。 |
-| `src/FactoryReport.Admin` | Blazor 管理后台空壳。依赖 Application，不依赖 Client。 |
-| `src/FactoryReport.Worker` | 后台 Worker：Fake 模式下启动/停止/周期心跳日志；不连 Oracle/MES。 |
-| `tests/FactoryReport.UnitTests` | 单元测试。 |
-| `tests/FactoryReport.IntegrationTests` | 集成测试（云端以 Fake 为准；真实 Oracle 测试【待现场确认】/CI）。 |
-| `tests/Fixtures` | 虚构/脱敏测试夹具。 |
-| `docs/` | 规格与架构文档（含 `operations.md`、各阶段 API 文档）。 |
-| `deploy/` | 部署脚本占位（iis / windows-service / oracle）。 |
+| `src/FactoryReport.Domain` | 领域模型与规则（组织、主数据、生产事实、计划、导入状态、报表编码、达成率、角色/策略名）。无基础设施、无 UI、无数据库驱动、无 Fake。 |
+| `src/FactoryReport.Application` | 应用服务、DTO、运行配置 POCO、数据访问只读仓储抽象、`IReportDataQueryService`、五张报表服务、认证与数据范围抽象。只依赖 Domain。 |
+| `src/FactoryReport.Infrastructure` | Fake 确定性夹具与内存仓储、Fake 本地账号、PBKDF2、Options 校验、UTC 时钟、`Persistence/Oracle/` **占位**。依赖 Application + Domain。 |
+| `src/FactoryReport.Api` | HTTP API：健康检查、ProblemDetails、Correlation ID、Cookie 认证与 Antiforgery、认证端点、只读报表端点。 |
+| `src/FactoryReport.Client` | Blazor WebAssembly PWA（MudBlazor）：PC 与手机浏览器共用。依赖 Application，不依赖 Admin/Api 项目。 |
+| `src/FactoryReport.Admin` | Blazor Server 运维端空壳。 |
+| `src/FactoryReport.Worker` | 后台 Worker：Fake 下心跳日志；不连 Oracle/MES。 |
+| `tests/*` | 单元 / 集成测试（云端以 Fake 为准）。 |
+| `docs/` | 规格与架构文档。 |
+| `deploy/` | 部署脚本占位（当前为空）。 |
 
-## 依赖规则
+## 2. 依赖规则
 
 允许：
 
@@ -33,62 +34,116 @@ Tests          -> 被测项目
 
 禁止：
 
-- Domain 依赖 Infrastructure / Application / 任何 UI / EF / Oracle 驱动
-- Application 依赖 Infrastructure 或 UI 层
-- Client ↔ Admin ↔ Api 之间互相项目引用
-- 任何项目引入 SQL Server 专用包或代码（`Microsoft.Data.SqlClient`、`System.Data.SqlClient`、`SqlBulkCopy` 等）
+- Domain 依赖 Infrastructure / Application / UI / EF / Oracle 驱动
+- Application 依赖 Infrastructure 或 UI
+- Client ↔ Admin ↔ Api 互相项目引用
+- 引入 SQL Server 专用包或代码
+- 浏览器持有 Oracle 连接凭据或直连 Oracle
+- 复制 DataEase / DataGear / 积木报表等产品源码拼装私有核心
 
-## Fake 模式与现场环境边界
+## 3. 商业化数据边界（必须遵守）
 
-| 项 | Fake（默认） | 现场 |
-|----|--------------|------|
-| 数据 | 确定性内存夹具（`Infrastructure/Fake` + `DeterministicFakeFixture`） | Oracle 持久化 |
-| 连接 | **禁止**连接任何数据库 | 服务器注入连接串/密钥 |
-| 配置 | `FactoryReport:DataMode=Fake` | `Oracle`（【待现场确认】） |
-| MES 同步 | Worker 仅心跳，不读 MES | 后续阶段 + 现场只读视图 |
-| 健康检查 ready | 成功且不探测外部 | 后续可加 Oracle 检查【待现场确认】 |
-| Cursor Cloud | 仅 Fake | 不得在云端连工厂内网/生产库 |
+### 3.1 Oracle 业务库 vs 产品配置/导入数据 —— 职责分离
 
-阶段 4/5/6 无论配置如何，Infrastructure 注册均强制 Fake 仓储实现，避免误连。夹具说明见 `docs/fake-data.md`。
+| 存储 | 职责 | 现状 |
+|------|------|------|
+| **Oracle 业务/MES 只读源** | 生产事实、工单、质量等现场数据（只读） | 未接入；表名/视图【待现场确认】 |
+| **产品应用库（规划 Oracle Schema）** | 账号、授权范围、导入批次、数据集版本、报表配置等产品自有数据 | 仅有逻辑设计文档；**无 DDL、无 DbContext 实现** |
+| **Fake 内存夹具** | 开发验证用确定性数据 | **代码已实现**；**不能**作为 Oracle 对接完成证明 |
 
-运维细节（日志脱敏、Correlation ID、健康检查语义、配置校验）见 `docs/operations.md`。
+不得把 MES 写权限交给本产品；不得把 Fake 结果写成「已完成现场对接」。
 
-## API 运行时基础（阶段 2 + 阶段 5/6/7/8/9 + 阶段 10/11）
+### 3.2 浏览器不得持有 Oracle 凭据
 
-- `GET /health`：详细状态 JSON（含 Fake 标识）；匿名
-- `GET /health/live`：存活检查；匿名
-- `GET /health/ready`：就绪检查（Fake 下不连外部）；匿名
-- `POST /api/v1/auth/login` / `POST /api/v1/auth/logout` / `GET /api/v1/auth/me`：本地账号 Cookie 认证（见 `docs/authentication.md`）
-- `GET /api/v1/reports/production-daily`：生产日报（见 `docs/api-production-daily.md`）
-- `GET /api/v1/reports/work-order-progress`：工单进度（见 `docs/api-work-order-progress.md`）
-- `GET /api/v1/reports/quality-statistics`：质量统计（见 `docs/api-quality-statistics.md`）
-- `GET /api/v1/reports/production-plan-achievement`：生产计划达成（见 `docs/api-production-plan-achievement.md`）
-- `GET /api/v1/reports/monthly-production-plan`：月度生产计划（见 `docs/api-monthly-production-plan.md`）
-- 报表 API **RequireAuthorization(ReportRead)** + 组织数据范围强制（见 `docs/authorization-and-data-scope.md`）
-- 全局异常 → RFC 7807 ProblemDetails（校验失败 → 400；数据范围拒绝 → 403）
-- `X-Correlation-ID` 透传/生成并写入响应头与日志 Scope
-- Development：可读 Console；Production：JSON Console
-- OpenAPI：`MapOpenApi`（Development / Testing）
+- Client 仅配置 `FactoryReportClient:ApiBaseUrl`（HTTP API 基址）。
+- 所有业务查询经 `FactoryReport.Api` 服务端执行。
+- Cookie 会话为 HttpOnly；不在 LocalStorage 存 Token/密码/连接串。
 
-## 未来 Oracle 接入位置【待现场确认】
+### 3.3 业务查询通过服务端执行
 
-接入点固定在：
+```text
+Browser (Client) --HTTPS/HTTP+Cookie--> Api --(Fake 仓储 | 未来 Oracle 仓储)--> 数据
+```
 
-`src/FactoryReport.Infrastructure/Persistence/Oracle/`
+报表入口：`I*ReportService` → `IReportDataQueryService` → `I*ReadRepository`。
 
-阶段 18 已完成**设计文档**（无实现）：`docs/oracle-integration-plan.md`、`docs/oracle-schema-design.md`、`docs/oracle-site-questionnaire.md`。
+### 3.4 Fake 仅用于开发验证
 
-后续在此实现（当前仅为占位 `OraclePersistencePlaceholder`）：
+- `FactoryReport:DataMode=Fake` + `Authentication:AccountStore=Fake` 为唯一可运行开发路径。
+- **`DataMode=Oracle`：本阶段未实现，启动显式失败，禁止静默回退 Fake。**
+- **`AccountStore=Oracle`：同上。**
+- Fake 通过 ≠ 现场 Oracle 验收通过。
 
-1. EF Core `DbContext`（`Oracle.EntityFrameworkCore`）—— 应用 Schema 可写数据
-2. ODP.NET / `Oracle.ManagedDataAccess.Core` 连接（凭据现场注入）
-3. 实现 Application `DataAccess` 下的 `I*ReadRepository`，在 `DependencyInjection.cs` 按 `DataMode` 替换 Fake
-4. 新增 **MES Reader** 只读层（生产/质量/工单事实；应用不写 MES）
-5. 实现 `ILocalAccountStore`（正式账号 / 密码哈希 / 角色 / 组织授权），按 `Authentication:AccountStore=Oracle` 替换 Fake
-6. Schema、字符集、连接方式、只读视图名称 —— 全部【待现场确认】
+### 3.5 多客户差异：映射与适配，不复制产品代码
 
-真实连接字符串、密码、Wallet、Token **不得**写入仓库；仅允许 `appsettings.Example.json` 占位说明。
+- 现场差异通过 `docs/source-mapping-template.md`、仓储适配与配置映射处理。
+- 禁止为每个客户复制整套 Domain/Application/Client。
 
-Application 查询入口：`IReportDataQueryService`（供报表引擎按 FactoryId / 日期范围 / 组织范围读取）。  
-生产日报应用服务：`IProductionDailyReportService`（仅依赖上述抽象，不直接引用 Fake 实现类）。
-认证入口：`ILocalAccountAuthenticationService` + Cookie 宿主（见 `docs/authentication.md`）。
+### 3.6 业务规则口径
+
+- 已确认规则见 `docs/business-decisions.md` 与各 API 文档。
+- Fake 临时口径必须标注「仅开发测试」。
+- 发现冲突：记录决策，不静默改指标公式。
+
+## 4. Fake 与现场边界
+
+| 项 | Fake（默认，可运行） | 现场（未来） |
+|----|----------------------|--------------|
+| 数据 | `DeterministicFakeFixture` 内存 | Oracle 持久化 + MES Reader |
+| 连接 | **禁止**连库 | 服务器注入连接串/密钥（不入库） |
+| `DataMode` | `Fake` | `Oracle`（实现前配置即失败） |
+| 健康检查 ready | 成功且不探测外部 | 可加 Oracle 探测【待现场确认】 |
+| Cursor Cloud | 仅 Fake | 不得连工厂内网/生产库 |
+
+## 5. API 运行时能力（代码已实现）
+
+- `GET /health`、`/health/live`、`/health/ready`（匿名）
+- `POST /api/v1/auth/login`、`POST /api/v1/auth/logout`、`GET /api/v1/auth/me`
+- 五张报表 `GET /api/v1/reports/...`：均 `RequireAuthorization(ReportRead)` + 组织范围强制
+- 校验失败 → 400；越权 → 403；未登录 → 401
+- Production 环境禁止 Fake 账号存储（启动失败）
+- 全局异常 → ProblemDetails；生产不返回堆栈
+
+## 6. 前端边界
+
+- 单一 Client：首页 `/`、报表列表 `/reports`、五张报表页、账号页、登录页。
+- 全局展示「演示数据 / Fake」。
+- 宽表容器内横向滚动；页面避免整体横向溢出。
+- 不向用户展示数据库密码、内部堆栈。
+
+## 7. Oracle 接入位置【待现场确认】
+
+目录：`src/FactoryReport.Infrastructure/Persistence/Oracle/`（当前 `OraclePersistencePlaceholder`）。
+
+后续实现顺序（未开始）：
+
+1. EF Core `DbContext`（应用 Schema 可写数据）
+2. ODP.NET 连接（凭据环境注入）
+3. 实现 `I*ReadRepository`，按 `DataMode=Oracle` 注册（替换当前 throw）
+4. MES Reader 只读层
+5. `ILocalAccountStore` Oracle 实现
+
+真实连接串、密码、Wallet **不得**写入仓库；仅 `appsettings.Example.json` 占位。
+
+设计文档：`oracle-integration-plan.md`、`oracle-schema-design.md`、`oracle-site-questionnaire.md`。
+
+## 8. Excel 导入边界
+
+| 已实现（第二阶段） | 仍未实现 |
+|--------------------|----------|
+| 模板下载、上传解析、逐行校验报告 | Oracle 应用 Schema 持久化 |
+| `ImportBatch` / `DatasetVersionState` 生命周期（发布/激活/回退） | 实际导入驱动计划达成正式对比接线 |
+| Fake 内存工作区（不写 Oracle 业务表） | 正式唯一键 / ReplaceScope【待现场确认】 |
+| PC 导入 UI；手机只读 | Admin 专用导入台 |
+
+详见 `docs/excel-import.md`、`docs/phase-02-result.md`。
+
+样例字段：`Id, FactoryId, DatasetCode, Status, SourceFileName, TotalRows, ErrorRows, CreatedAtUtc, CompletedAtUtc`（见 Domain）。正式模板与唯一键【待现场确认】。
+
+## 9. 相关文档
+
+- 运维：`operations.md`
+- 认证 / 授权：`authentication.md`、`authorization-and-data-scope.md`
+- Fake：`fake-data.md`
+- 开发启动：`development.md`
+- 第三方组件：`third-party-components.md`

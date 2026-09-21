@@ -31,6 +31,35 @@
     </MudAlert>
 }
 
-<MudText Typo="Typo.body2">
-    请使用底部导航进入各报表模块。报表数据需联网从 API 获取，离线不会展示过期数据为实时结果。
+<MudText Typo="Typo.subtitle1" Class="mb-2">报表列表</MudText>
+<MudText Typo="Typo.body2" Class="mb-3">
+    选择下方报表进入查询。数据需联网从 API 获取；当前为演示数据 / Fake。
 </MudText>
+
+<div class="report-list">
+    @foreach (var item in ReportLinks)
+    {
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Href="@item.Href"
+                   Class="report-list-item mb-2"
+                   StartIcon="@item.Icon">
+            @item.Title
+        </MudButton>
+    }
+</div>
+
+@code {
+    private sealed record ReportLink(string Href, string Title, string Icon);
+
+    private static readonly ReportLink[] ReportLinks =
+    [
+        new("/reports/production-daily", "生产日报", Icons.Material.Filled.Today),
+        new("/reports/work-order-progress", "工单进度", Icons.Material.Filled.Assignment),
+        new("/reports/quality-statistics", "质量统计", Icons.Material.Filled.FactCheck),
+        new("/reports/production-plan-achievement", "计划达成", Icons.Material.Filled.TrendingUp),
+        new("/reports/monthly-production-plan", "月度生产计划", Icons.Material.Filled.CalendarMonth),
+        new("/imports", "Excel 数据导入", Icons.Material.Filled.UploadFile)
+    ];
+}

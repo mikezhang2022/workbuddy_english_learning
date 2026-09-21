@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using FactoryReport.Api.Middleware;
 using FactoryReport.Application.Common;
+using FactoryReport.Application.Import;
 using FactoryReport.Application.Security.DataScope;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -68,6 +69,46 @@ public sealed class GlobalExceptionHandler(
                 Detail = forbidden.Message
             };
             problem.Extensions["errors"] = forbidden.Errors;
+        }
+        else if (exception is ExcelParseException parse)
+        {
+            logger.LogWarning(
+                exception,
+                "Excel parse failed. CorrelationId={CorrelationId} Path={Path}",
+                correlationId,
+                httpContext.Request.Path.Value);
+
+            problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Excel parse failed",
+                Type = "https://tools.ietf.org/html/rfc7807",
+                Instance = httpContext.Request.Path.Value,
+                Detail = parse.Message
+            };
+        }
+        else if (exception is InvalidOperationException invalid
+                 && (invalid.Message.Contains("cannot be published", StringComparison.OrdinalIgnoreCase)
+                     || invalid.Message.Contains("cannot be validated", StringComparison.OrdinalIgnoreCase)
+                     || invalid.Message.Contains("cannot be rolled back", StringComparison.OrdinalIgnoreCase)
+                     || invalid.Message.Contains("不得发布", StringComparison.Ordinal)
+                     || invalid.Message.Contains("Published batch", StringComparison.OrdinalIgnoreCase)
+                     || invalid.Message.Contains("no published version", StringComparison.OrdinalIgnoreCase)))
+        {
+            logger.LogWarning(
+                exception,
+                "Import lifecycle rejected. CorrelationId={CorrelationId} Path={Path}",
+                correlationId,
+                httpContext.Request.Path.Value);
+
+            problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Invalid state",
+                Type = "https://tools.ietf.org/html/rfc7807",
+                Instance = httpContext.Request.Path.Value,
+                Detail = invalid.Message
+            };
         }
         else
         {
