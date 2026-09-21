@@ -10,9 +10,9 @@
 | 仓库 | `mikezhang2022/workbuddy_english_learning` |
 | 子项目 | `factory-report-starter/` |
 | 基线 tip | `86a1776`（第一阶段 PR #4 头） |
-| 开发分支 | （提交后填写） |
-| 最终提交号 | （提交后填写） |
-| PR | （草稿，提交后填写） |
+| 开发分支 | `cursor/bc-82b70fdf-f902-46e4-b16b-d2db46a0e6da-7c2f`（基于 `cursor/bi-2a49` tip，未 rebase） |
+| 最终提交号 | `5bbc2ceb8b0e20b622fd8fa41042dfb9dd6ce426` |
+| PR | https://github.com/mikezhang2022/workbuddy_english_learning/pull/5 （草稿） |
 
 ## 2. 复用与本阶段变更
 
