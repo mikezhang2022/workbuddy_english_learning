@@ -157,3 +157,26 @@ chromium --window-size=390,844 http://localhost:5269/reports/production-daily
 
 本仓库为多项目 monorepo。根级 `.cursor/environment.json` **本阶段未新增**，以免影响 `phonics-app` 等其它目录。  
 `factory-report-starter` 依赖安装步骤以本文与 `scripts/dev-bootstrap.sh` 为准。
+
+## 10. 常见问题（Troubleshooting）
+
+本节记录**开发机 / 受限沙箱**上的环境陷阱，与产品代码无关。
+
+### 10.1 系统代理劫持 localhost
+
+**现象**：开发机开启系统代理（例如 Clash / FlClash 监听 `127.0.0.1:7890`）时，浏览器访问本地前端 `http://127.0.0.1:5269` 会被代理劫持，页面停留在 `about:blank` 或全白，看起来像应用未启动或渲染失败。
+
+**判断**：命令行 `curl http://127.0.0.1:5269/` 返回 **200**，但浏览器打开是白屏 → 基本可判定为代理劫持。
+
+**解决**：
+
+1. 浏览器进程启动前设置环境变量：`NO_PROXY=localhost,127.0.0.1`
+2. Chromium 系浏览器再加启动参数：`--proxy-bypass-list="<-loopback>"`
+
+后端 Api 服务本身不受影响。此问题只影响开发机浏览器访问本地前端，与产品代码无关。
+
+### 10.2 受限沙箱 / CI 中 curl 的 cookie jar 不落盘
+
+**现象**：`curl -c cookies.txt` 登录后 `cookies.txt` 不生成，后续带 `-b cookies.txt` 的请求恒返回 **401**「Not authenticated」，容易被误判为产品认证缺陷。
+
+**正确做法**：在受限环境验证 Cookie 认证时，改用 Python `urllib` + `http.cookiejar.CookieJar` 的脚本方式，或使用 `--cookie` 显式传值，不要依赖沙箱可能禁止落盘的 `-c` cookie jar 文件。
